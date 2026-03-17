@@ -1,45 +1,61 @@
 import SwiftUI
+import AppKit
 import HotKey
 
 @main
 struct TurnshareApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    @StateObject private var appState = AppState()
 
     var body: some Scene {
-        MenuBarExtra("Turnshare", systemImage: "arrow.up.message") {
-            SessionListView()
-                .environmentObject(appState)
-                .frame(width: 400, height: 500)
-        }
-        .menuBarExtraStyle(.window)
+        // No visible windows — all UI is in the popover
+        Settings { EmptyView() }
     }
 }
 
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    private var statusItem: NSStatusItem!
+    private var popover: NSPopover!
     private var hotKey: HotKey?
+    private let appState = AppState()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Cmd+Option+Control+C
+        // Hide from dock
+        NSApp.setActivationPolicy(.accessory)
+
+        // Create status bar item
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        if let button = statusItem.button {
+            button.image = NSImage(systemSymbolName: "arrow.up.message", accessibilityDescription: "Turnshare")
+            button.action = #selector(togglePopover)
+            button.target = self
+        }
+
+        // Create popover
+        popover = NSPopover()
+        popover.contentSize = NSSize(width: 400, height: 500)
+        popover.behavior = .transient
+        popover.contentViewController = NSHostingController(
+            rootView: SessionListView().environmentObject(appState)
+        )
+
+        // Global hotkey: Cmd+Option+Control+C
         hotKey = HotKey(key: .c, modifiers: [.command, .option, .control])
         hotKey?.keyDownHandler = { [weak self] in
-            self?.togglePopover()
+            Task { @MainActor in
+                self?.togglePopover()
+            }
         }
     }
 
-    private func togglePopover() {
-        // MenuBarExtra handles its own popover; sending a click to the status item toggles it
-        if let button = NSApp.statusBarButton {
-            button.performClick(nil)
-        }
-    }
-}
+    @objc private func togglePopover() {
+        guard let button = statusItem.button else { return }
 
-extension NSApplication {
-    var statusBarButton: NSStatusBarButton? {
-        NSApp.windows
-            .compactMap { $0.value(forKey: "statusItem") as? NSStatusItem }
-            .first?
-            .button
+        if popover.isShown {
+            popover.performClose(nil)
+        } else {
+            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            popover.contentViewController?.view.window?.makeKey()
+        }
     }
 }

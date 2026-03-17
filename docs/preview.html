@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Preview</title></head>
+<body>
+<script>
+// Intercept fetch to serve inline test data instead of calling GitHub API
+const TEST_SESSION = {
+  "version": "1",
+  "metadata": {
+    "agent": "claude-code",
+    "model": "claude-sonnet-4-20250514",
+    "sessionId": "abc123-test",
+    "projectName": "myproject",
+    "gitBranch": "feat/auth-flow",
+    "startedAt": "2026-03-17T10:30:00Z",
+    "endedAt": "2026-03-17T10:45:22Z"
+  },
+  "turns": [
+    {
+      "role": "user",
+      "timestamp": "2026-03-17T10:30:00Z",
+      "content": [{ "type": "text", "text": "Add a login endpoint to the Express server that validates credentials against the database and returns a JWT token." }]
+    },
+    {
+      "role": "assistant",
+      "timestamp": "2026-03-17T10:30:15Z",
+      "content": [
+        { "type": "text", "text": "I'll add a login endpoint. Let me check the existing setup first." },
+        { "type": "tool_use", "name": "Read", "id": "tool_01", "input": "{\"file_path\": \"/Users/dev/myproject/src/server.ts\"}" }
+      ]
+    },
+    {
+      "role": "tool",
+      "timestamp": "2026-03-17T10:30:16Z",
+      "content": [
+        { "type": "tool_result", "toolUseId": "tool_01", "name": "Read", "output": "import express from 'express';\nimport { db } from './db';\n\nconst app = express();\napp.use(express.json());\n\napp.get('/health', (req, res) => res.json({ ok: true }));\n\napp.listen(3000);" }
+      ]
+    },
+    {
+      "role": "assistant",
+      "timestamp": "2026-03-17T10:30:25Z",
+      "content": [
+        { "type": "text", "text": "I see the server setup. Now let me add the login endpoint with JWT support.\n\n## Changes\n\n- Added `POST /auth/login` endpoint\n- Validates email and password against the `users` table\n- Returns a signed JWT token on success\n- Uses **bcrypt** for password comparison\n\nHere's the implementation:\n\n```typescript\napp.post('/auth/login', async (req, res) => {\n  const { email, password } = req.body;\n  const user = await db.users.findByEmail(email);\n  if (!user || !await bcrypt.compare(password, user.passwordHash)) {\n    return res.status(401).json({ error: 'Invalid credentials' });\n  }\n  const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET);\n  res.json({ token });\n});\n```\n\nAnd a Python example:\n\n```python\n@app.route('/auth/login', methods=['POST'])\ndef login():\n    data = request.get_json()\n    user = User.query.filter_by(email=data['email']).first()\n    if not user or not bcrypt.check_password_hash(user.password_hash, data['password']):\n        return jsonify({'error': 'Invalid credentials'}), 401\n    token = create_access_token(identity=user.id)\n    return jsonify({'token': token})\n```\n\nAnd a bash install command:\n\n```bash\nnpm install jsonwebtoken bcrypt\nnpm install -D @types/jsonwebtoken @types/bcrypt\nexport JWT_SECRET=\"your-secret-key\"\n```" },
+        { "type": "tool_use", "name": "Edit", "id": "tool_02", "input": "{\"file_path\": \"/Users/dev/myproject/src/server.ts\", \"old_string\": \"app.listen(3000);\"}" }
+      ]
+    },
+    {
+      "role": "tool",
+      "timestamp": "2026-03-17T10:30:26Z",
+      "content": [
+        { "type": "tool_result", "toolUseId": "tool_02", "name": "Edit", "output": "Successfully edited /Users/dev/myproject/src/server.ts" }
+      ]
+    },
+    {
+      "role": "user",
+      "timestamp": "2026-03-17T10:31:00Z",
+      "content": [{ "type": "text", "text": "Looks good. Can you also add rate limiting to prevent brute force attacks?" }]
+    },
+    {
+      "role": "assistant",
+      "timestamp": "2026-03-17T10:31:20Z",
+      "content": [
+        { "type": "text", "text": "Rate limiting added. The login endpoint now allows max 5 attempts per IP within a 15-minute window.\n\n```bash\nnpm install express-rate-limit\n```\n\nDone — you've got JWT auth with brute force protection." }
+      ]
+    }
+  ]
+};
+
+const _fetch = window.fetch;
+window.fetch = async (url, ...args) => {
+  if (typeof url === 'string' && url.includes('api.github.com/gists/')) {
+    return new Response(JSON.stringify({
+      files: { 'session.json': { content: JSON.stringify(TEST_SESSION), truncated: false } },
+      owner: { login: 'nclandrei' }
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  }
+  return _fetch(url, ...args);
+};
+history.replaceState(null, '', '?g=preview');
+
+// Load and inject the real renderer
+_fetch('index.html').then(r => r.text()).then(html => {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  for (const s of doc.querySelectorAll('style')) document.head.appendChild(s.cloneNode(true));
+  document.body.innerHTML = '';
+  const root = doc.getElementById('root');
+  if (root) document.body.appendChild(root.cloneNode(true));
+  for (const s of doc.querySelectorAll('script')) {
+    const el = document.createElement('script');
+    el.textContent = s.textContent;
+    document.body.appendChild(el);
+  }
+});
+</script>
+</body>
+</html>
