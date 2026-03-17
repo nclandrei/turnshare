@@ -207,6 +207,36 @@
             font-size: inherit;
         }
 
+        /* Copy button */
+        .copy-btn {
+            background: none;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            padding: 2px 8px;
+            transition: color 0.15s, border-color 0.15s;
+        }
+        .copy-btn:hover { color: var(--text); border-color: var(--text-muted); }
+        .copy-btn.copied { color: var(--accent-green); border-color: var(--accent-green); }
+
+        /* Syntax highlighting tokens */
+        .sh-keyword { color: #ff7b72; }
+        .sh-string { color: #a5d6ff; }
+        .sh-comment { color: #6e7681; font-style: italic; }
+        .sh-number { color: #79c0ff; }
+        .sh-function { color: #d2a8ff; }
+        .sh-operator { color: #ff7b72; }
+        .sh-punctuation { color: #8b949e; }
+        .sh-type { color: #ffa657; }
+        .sh-property { color: #79c0ff; }
+        .sh-builtin { color: #ffa657; }
+        .sh-variable { color: #ffa657; }
+        .sh-tag { color: #7ee787; }
+        .sh-attr { color: #79c0ff; }
+
         /* Tool use/result blocks */
         .tool-block {
             margin: 8px 0;
@@ -486,8 +516,9 @@
 
                 // Fenced code blocks: ```lang\n...\n```
                 html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
-                    const header = lang ? `<div class="code-block-header"><span>${lang}</span></div>` : '';
-                    return `</p><div class="code-block">${header}<pre><code>${code}</code></pre></div><p>`;
+                    const highlighted = highlight(code, lang);
+                    const headerHtml = `<div class="code-block-header"><span>${lang || 'text'}</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>`;
+                    return `</p><div class="code-block">${headerHtml}<pre><code>${highlighted}</code></pre></div><p>`;
                 });
 
                 // Inline code
@@ -575,7 +606,160 @@
                     return `${h}h ${m % 60}m`;
                 } catch { return ''; }
             }
+
+            // ---- Syntax Highlighting ----
+            // Minimal regex-based highlighter. Covers the common tokens
+            // in JS/TS, Python, Bash, Go, Rust, Swift, JSON, and generic code.
+            // Already-escaped HTML entities from esc() are preserved.
+
+            const LANG_RULES = {
+                javascript: tokenRulesJS(), typescript: tokenRulesJS(),
+                js: tokenRulesJS(), ts: tokenRulesJS(), jsx: tokenRulesJS(), tsx: tokenRulesJS(),
+                python: tokenRulesPy(), py: tokenRulesPy(),
+                bash: tokenRulesSh(), sh: tokenRulesSh(), shell: tokenRulesSh(), zsh: tokenRulesSh(), fish: tokenRulesSh(),
+                json: tokenRulesJSON(),
+                go: tokenRulesGo(),
+                rust: tokenRulesRust(), rs: tokenRulesRust(),
+                swift: tokenRulesSwift(),
+                css: tokenRulesCSS(),
+                html: tokenRulesHTML(), xml: tokenRulesHTML(),
+                sql: tokenRulesSQL(),
+            };
+
+            function highlight(code, lang) {
+                const rules = LANG_RULES[(lang || '').toLowerCase()];
+                if (!rules) return code; // no rules = return as-is (already escaped)
+                return applyRules(code, rules);
+            }
+
+            function applyRules(code, rules) {
+                // Build one combined regex from all rules
+                const parts = rules.map((r, i) => `(${r.pattern.source})`);
+                const combined = new RegExp(parts.join('|'), 'gm');
+                return code.replace(combined, function() {
+                    const args = arguments;
+                    // Find which group matched
+                    let offset = 1;
+                    for (let i = 0; i < rules.length; i++) {
+                        if (args[offset] !== undefined) {
+                            return `<span class="${rules[i].cls}">${args[offset]}</span>`;
+                        }
+                        offset += rules[i].groups + 1;
+                    }
+                    return args[0];
+                });
+            }
+
+            function r(pattern, cls, groups) { return { pattern, cls, groups: groups || 0 }; }
+
+            function tokenRulesJS() { return [
+                r(/\/\/.*$/m, 'sh-comment'),
+                r(/\/\*[\s\S]*?\*\//, 'sh-comment'),
+                r(/(["'])(?:(?!\1|\\).|\\.)*\1/, 'sh-string'),
+                r(/`(?:[^`\\]|\\.)*`/, 'sh-string'),
+                r(/\b(async|await|break|case|catch|class|const|continue|debugger|default|delete|do|else|export|extends|finally|for|from|function|if|import|in|instanceof|let|new|of|return|super|switch|this|throw|try|typeof|var|void|while|with|yield)\b/, 'sh-keyword'),
+                r(/\b(true|false|null|undefined|NaN|Infinity)\b/, 'sh-builtin'),
+                r(/\b(string|number|boolean|any|void|never|unknown|object|symbol|bigint|interface|type|enum|namespace|declare|readonly|keyof|infer|extends)\b/, 'sh-type'),
+                r(/\b\d+\.?\d*(?:[eE][+-]?\d+)?\b/, 'sh-number'),
+                r(/=&gt;|[=!]==?|&amp;&amp;|\|\||[+\-*/%]=?|&lt;=?|&gt;=?/, 'sh-operator'),
+            ]; }
+
+            function tokenRulesPy() { return [
+                r(/#.*$/m, 'sh-comment'),
+                r(/("""[\s\S]*?"""|'''[\s\S]*?''')/, 'sh-string'),
+                r(/(["'])(?:(?!\1|\\).|\\.)*\1/, 'sh-string'),
+                r(/\b(and|as|assert|async|await|break|class|continue|def|del|elif|else|except|finally|for|from|global|if|import|in|is|lambda|nonlocal|not|or|pass|raise|return|try|while|with|yield)\b/, 'sh-keyword'),
+                r(/\b(True|False|None|self|cls)\b/, 'sh-builtin'),
+                r(/\b(int|float|str|bool|list|dict|set|tuple|bytes|type|object)\b/, 'sh-type'),
+                r(/\b\d+\.?\d*(?:[eE][+-]?\d+)?\b/, 'sh-number'),
+                r(/(@\w+)/, 'sh-function'),
+            ]; }
+
+            function tokenRulesSh() { return [
+                r(/#.*$/m, 'sh-comment'),
+                r(/(["'])(?:(?!\1|\\).|\\.)*\1/, 'sh-string'),
+                r(/\b(if|then|else|elif|fi|for|while|do|done|case|esac|in|function|return|local|export|source|alias|unalias|set|unset)\b/, 'sh-keyword'),
+                r(/\$\w+|\$\{[^}]+\}/, 'sh-variable'),
+                r(/\b\d+\b/, 'sh-number'),
+                r(/[|;&]|&amp;&amp;|\|\|/, 'sh-operator'),
+            ]; }
+
+            function tokenRulesJSON() { return [
+                r(/(")(?:(?!"|\\).|\\.)*(")\s*:/, 'sh-property', 0),
+                r(/(["'])(?:(?!\1|\\).|\\.)*\1/, 'sh-string'),
+                r(/\b(true|false|null)\b/, 'sh-builtin'),
+                r(/\b-?\d+\.?\d*(?:[eE][+-]?\d+)?\b/, 'sh-number'),
+            ]; }
+
+            function tokenRulesGo() { return [
+                r(/\/\/.*$/m, 'sh-comment'),
+                r(/\/\*[\s\S]*?\*\//, 'sh-comment'),
+                r(/(["'`])(?:(?!\1|\\).|\\.)*\1/, 'sh-string'),
+                r(/\b(break|case|chan|const|continue|default|defer|else|fallthrough|for|func|go|goto|if|import|interface|map|package|range|return|select|struct|switch|type|var)\b/, 'sh-keyword'),
+                r(/\b(true|false|nil|iota)\b/, 'sh-builtin'),
+                r(/\b(int|int8|int16|int32|int64|uint|uint8|uint16|uint32|uint64|float32|float64|complex64|complex128|byte|rune|string|bool|error|any)\b/, 'sh-type'),
+                r(/\b\d+\.?\d*(?:[eE][+-]?\d+)?\b/, 'sh-number'),
+                r(/:=|=&gt;|[=!]=|&amp;&amp;|\|\||[+\-*/%]=?|&lt;-?|&gt;=?/, 'sh-operator'),
+            ]; }
+
+            function tokenRulesRust() { return [
+                r(/\/\/.*$/m, 'sh-comment'),
+                r(/\/\*[\s\S]*?\*\//, 'sh-comment'),
+                r(/(["'])(?:(?!\1|\\).|\\.)*\1/, 'sh-string'),
+                r(/\b(as|async|await|break|const|continue|crate|dyn|else|enum|extern|fn|for|if|impl|in|let|loop|match|mod|move|mut|pub|ref|return|self|Self|static|struct|super|trait|type|union|unsafe|use|where|while|yield)\b/, 'sh-keyword'),
+                r(/\b(true|false|None|Some|Ok|Err)\b/, 'sh-builtin'),
+                r(/\b(i8|i16|i32|i64|i128|isize|u8|u16|u32|u64|u128|usize|f32|f64|bool|char|str|String|Vec|Box|Option|Result)\b/, 'sh-type'),
+                r(/\b\d+\.?\d*(?:[eE][+-]?\d+)?\b/, 'sh-number'),
+                r(/=&gt;|[=!]==?|&amp;&amp;|\|\||[+\-*/%]=?|&lt;=?|&gt;=?|::/, 'sh-operator'),
+            ]; }
+
+            function tokenRulesSwift() { return [
+                r(/\/\/.*$/m, 'sh-comment'),
+                r(/\/\*[\s\S]*?\*\//, 'sh-comment'),
+                r(/(["'])(?:(?!\1|\\).|\\.)*\1/, 'sh-string'),
+                r(/\b(associatedtype|break|case|catch|class|continue|default|defer|deinit|do|else|enum|extension|fallthrough|fileprivate|for|func|guard|if|import|in|init|inout|internal|is|let|mutating|nonmutating|open|operator|override|private|protocol|public|repeat|rethrows|return|self|Self|static|struct|subscript|super|switch|throw|throws|try|typealias|var|weak|where|while|async|await)\b/, 'sh-keyword'),
+                r(/\b(true|false|nil)\b/, 'sh-builtin'),
+                r(/\b(Int|Int8|Int16|Int32|Int64|UInt|Float|Double|Bool|String|Array|Dictionary|Set|Optional|Any|AnyObject|Void)\b/, 'sh-type'),
+                r(/\b\d+\.?\d*(?:[eE][+-]?\d+)?\b/, 'sh-number'),
+                r(/@\w+/, 'sh-function'),
+            ]; }
+
+            function tokenRulesCSS() { return [
+                r(/\/\*[\s\S]*?\*\//, 'sh-comment'),
+                r(/(["'])(?:(?!\1|\\).|\\.)*\1/, 'sh-string'),
+                r(/(#[0-9a-fA-F]{3,8})\b/, 'sh-number'),
+                r(/\b\d+\.?\d*(px|em|rem|%|vh|vw|s|ms|deg|fr)?\b/, 'sh-number'),
+                r(/[.#][\w-]+/, 'sh-function'),
+                r(/\b(important|inherit|initial|unset|none|auto|flex|grid|block|inline|relative|absolute|fixed|sticky)\b/, 'sh-keyword'),
+            ]; }
+
+            function tokenRulesHTML() { return [
+                r(/&lt;!--[\s\S]*?--&gt;/, 'sh-comment'),
+                r(/(&lt;\/?)([\w-]+)/, 'sh-tag', 1),
+                r(/([\w-]+)(=)/, 'sh-attr', 1),
+                r(/(["'])(?:(?!\1|\\).|\\.)*\1/, 'sh-string'),
+            ]; }
+
+            function tokenRulesSQL() { return [
+                r(/--.*$/m, 'sh-comment'),
+                r(/\/\*[\s\S]*?\*\//, 'sh-comment'),
+                r(/(["'])(?:(?!\1|\\).|\\.)*\1/, 'sh-string'),
+                r(/\b(SELECT|FROM|WHERE|INSERT|INTO|UPDATE|SET|DELETE|CREATE|ALTER|DROP|TABLE|INDEX|VIEW|JOIN|LEFT|RIGHT|INNER|OUTER|ON|AND|OR|NOT|IN|IS|NULL|AS|ORDER|BY|GROUP|HAVING|LIMIT|OFFSET|UNION|ALL|DISTINCT|COUNT|SUM|AVG|MIN|MAX|CASE|WHEN|THEN|ELSE|END|EXISTS|BETWEEN|LIKE|VALUES|PRIMARY|KEY|FOREIGN|REFERENCES|CONSTRAINT|DEFAULT|CHECK|UNIQUE|CASCADE|GRANT|REVOKE|BEGIN|COMMIT|ROLLBACK|TRANSACTION)\b/i, 'sh-keyword'),
+                r(/\b(INTEGER|INT|BIGINT|SMALLINT|TINYINT|FLOAT|DOUBLE|DECIMAL|NUMERIC|CHAR|VARCHAR|TEXT|BLOB|DATE|TIME|TIMESTAMP|DATETIME|BOOLEAN|SERIAL|UUID)\b/i, 'sh-type'),
+                r(/\b\d+\.?\d*\b/, 'sh-number'),
+            ]; }
         })();
+
+        // Global copy handler (needs to be outside the IIFE)
+        function copyCode(btn) {
+            const block = btn.closest('.code-block');
+            const code = block.querySelector('code').textContent;
+            navigator.clipboard.writeText(code).then(() => {
+                btn.textContent = 'Copied!';
+                btn.classList.add('copied');
+                setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1500);
+            });
+        }
     </script>
 </body>
 </html>
