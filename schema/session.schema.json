@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Turnshare Session",
+  "description": "Normalized AI coding session format used by Turnshare. This is the contract between the macOS app (producer) and the web renderer (consumer).",
+  "type": "object",
+  "required": ["version", "metadata", "turns"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "const": "1"
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["agent", "sessionId", "startedAt"],
+      "properties": {
+        "agent": {
+          "type": "string",
+          "enum": ["claude-code", "codex", "opencode"]
+        },
+        "model": { "type": "string" },
+        "sessionId": { "type": "string" },
+        "projectPath": { "type": "string" },
+        "projectName": { "type": "string" },
+        "gitBranch": { "type": "string" },
+        "startedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "endedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "turns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["role", "content", "timestamp"],
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": ["user", "assistant", "tool"]
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "content": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "required": ["type", "text"],
+                  "properties": {
+                    "type": { "const": "text" },
+                    "text": { "type": "string" }
+                  }
+                },
+                {
+                  "type": "object",
+                  "required": ["type", "name", "id"],
+                  "properties": {
+                    "type": { "const": "tool_use" },
+                    "name": { "type": "string" },
+                    "id": { "type": "string" },
+                    "input": { "type": "string", "description": "JSON-encoded string of the tool input" }
+                  }
+                },
+                {
+                  "type": "object",
+                  "required": ["type", "toolUseId", "output"],
+                  "properties": {
+                    "type": { "const": "tool_result" },
+                    "toolUseId": { "type": "string" },
+                    "name": { "type": "string" },
+                    "output": { "type": "string" }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

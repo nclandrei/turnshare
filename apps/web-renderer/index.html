@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Turnshare</title>
+    <style>
+        /* TODO: terminal-inspired dark theme */
+        body { font-family: monospace; background: #1a1a2e; color: #e0e0e0; margin: 0; padding: 20px; }
+        .loading { text-align: center; padding: 100px; color: #888; }
+        .error { text-align: center; padding: 100px; color: #e74c3c; }
+    </style>
+</head>
+<body>
+    <div id="root" class="loading">Loading session...</div>
+    <script>
+        // Turnshare Web Renderer
+        // Fetches session.json from a GitHub Gist and renders it.
+        // Schema: see /schema/session.schema.json
+
+        (async function() {
+            const root = document.getElementById('root');
+            const pathMatch = window.location.pathname.match(/^\/g\/([a-f0-9]+)$/);
+            const gistId = pathMatch ? pathMatch[1] : new URLSearchParams(window.location.search).get('g');
+
+            if (!gistId) {
+                root.className = 'error';
+                root.textContent = 'No session ID provided. Use /g/<gist-id>';
+                return;
+            }
+
+            try {
+                const res = await fetch(`https://api.github.com/gists/${gistId}`);
+                if (!res.ok) throw new Error(`Gist not found (${res.status})`);
+                const gist = await res.json();
+                const sessionFile = gist.files['session.json'];
+                if (!sessionFile) throw new Error('No session.json in gist');
+                const session = JSON.parse(sessionFile.content);
+                render(session);
+            } catch (e) {
+                root.className = 'error';
+                root.textContent = e.message;
+            }
+
+            function render(session) {
+                root.className = '';
+                root.innerHTML = '<p>Session loaded. Renderer TODO.</p>';
+                // TODO: build terminal-inspired session view from session.turns
+            }
+        })();
+    </script>
+</body>
+</html>
