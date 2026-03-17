@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Turnshare</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg: #0d1117;
+            --bg-surface: #161b22;
+            --bg-elevated: #1c2129;
+            --border: #30363d;
+            --border-subtle: #21262d;
+            --text: #e6edf3;
+            --text-muted: #8b949e;
+            --text-subtle: #6e7681;
+            --accent-blue: #58a6ff;
+            --accent-green: #3fb950;
+            --accent-orange: #d29922;
+            --accent-purple: #bc8cff;
+            --accent-red: #f85149;
+            --accent-cyan: #76d9e6;
+            --user-bg: #161b22;
+            --assistant-bg: #0d1117;
+            --tool-bg: #111518;
+            --radius: 8px;
+            --font-mono: 'SF Mono', 'Cascadia Code', 'Fira Code', Menlo, Monaco, 'Courier New', monospace;
+            --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            font-family: var(--font-mono);
+            font-size: 14px;
+            line-height: 1.6;
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        .loading, .error {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            font-size: 15px;
+        }
+        .loading { color: var(--text-muted); }
+        .error { color: var(--accent-red); }
+
+        /* Header */
+        .session-header {
+            border-bottom: 1px solid var(--border);
+            padding: 24px 0;
+            margin-bottom: 0;
+            background: var(--bg-surface);
+        }
+        .header-inner {
+            max-width: 860px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+        .header-top {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        .agent-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 3px 10px;
+            border-radius: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .agent-badge.claude-code { background: #553518; color: #f0a050; }
+        .agent-badge.codex { background: #1a3a1a; color: var(--accent-green); }
+        .agent-badge.opencode { background: #1a2a3a; color: var(--accent-cyan); }
+        .header-project {
+            font-size: 18px;
+            font-weight: 600;
+            font-family: var(--font-sans);
+            color: var(--text);
+        }
+        .header-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+        .header-meta span {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .meta-label { color: var(--text-subtle); }
+
+        /* Turn container */
+        .turns {
+            max-width: 860px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        /* Turn */
+        .turn {
+            border-bottom: 1px solid var(--border-subtle);
+            padding: 20px 0;
+        }
+        .turn:last-child { border-bottom: none; }
+
+        .turn-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+            font-size: 12px;
+        }
+        .role-indicator {
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+        .role-user .role-indicator { background: #1a2a1a; color: var(--accent-green); }
+        .role-assistant .role-indicator { background: #1a1a2e; color: var(--accent-purple); }
+        .role-tool .role-indicator { background: #1a2020; color: var(--accent-cyan); }
+        .turn-timestamp {
+            color: var(--text-subtle);
+            font-size: 11px;
+        }
+
+        .turn-content {
+            padding-left: 0;
+        }
+
+        /* Text content */
+        .content-text {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            line-height: 1.65;
+        }
+        .content-text p { margin-bottom: 10px; }
+        .content-text p:last-child { margin-bottom: 0; }
+        .content-text strong { color: #fff; font-weight: 600; }
+        .content-text em { font-style: italic; color: var(--text-muted); }
+        .content-text a { color: var(--accent-blue); text-decoration: none; }
+        .content-text a:hover { text-decoration: underline; }
+        .content-text code {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 1px 6px;
+            font-size: 13px;
+        }
+        .content-text ul, .content-text ol {
+            margin: 8px 0;
+            padding-left: 24px;
+        }
+        .content-text li { margin-bottom: 4px; }
+        .content-text h1, .content-text h2, .content-text h3 {
+            font-family: var(--font-sans);
+            margin: 16px 0 8px;
+            color: #fff;
+        }
+        .content-text h1 { font-size: 20px; }
+        .content-text h2 { font-size: 17px; }
+        .content-text h3 { font-size: 15px; }
+
+        /* Code blocks */
+        .code-block {
+            position: relative;
+            margin: 12px 0;
+            border-radius: var(--radius);
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+        .code-block-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 12px;
+            background: var(--bg-elevated);
+            border-bottom: 1px solid var(--border);
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+        .code-block pre {
+            margin: 0;
+            padding: 12px 16px;
+            background: var(--bg-surface);
+            overflow-x: auto;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .code-block code {
+            background: none;
+            border: none;
+            padding: 0;
+            font-size: inherit;
+        }
+
+        /* Tool use/result blocks */
+        .tool-block {
+            margin: 8px 0;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+        }
+        .tool-block-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: var(--bg-elevated);
+            cursor: pointer;
+            user-select: none;
+            font-size: 12px;
+        }
+        .tool-block-header:hover { background: #252b33; }
+        .tool-chevron {
+            color: var(--text-subtle);
+            font-size: 10px;
+            transition: transform 0.15s;
+            flex-shrink: 0;
+        }
+        .tool-block.open .tool-chevron { transform: rotate(90deg); }
+        .tool-name {
+            font-weight: 600;
+            color: var(--accent-cyan);
+        }
+        .tool-id {
+            color: var(--text-subtle);
+            font-size: 11px;
+            margin-left: auto;
+        }
+        .tool-body {
+            display: none;
+            border-top: 1px solid var(--border);
+            max-height: 400px;
+            overflow: auto;
+        }
+        .tool-block.open .tool-body { display: block; }
+        .tool-body pre {
+            margin: 0;
+            padding: 12px 16px;
+            background: var(--bg-surface);
+            font-size: 12px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        /* Footer */
+        .session-footer {
+            border-top: 1px solid var(--border);
+            padding: 16px 0;
+            margin-top: 0;
+            background: var(--bg-surface);
+        }
+        .footer-inner {
+            max-width: 860px;
+            margin: 0 auto;
+            padding: 0 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--text-subtle);
+        }
+        .footer-inner a {
+            color: var(--text-muted);
+            text-decoration: none;
+        }
+        .footer-inner a:hover { color: var(--text); }
+
+        @media (max-width: 640px) {
+            .header-inner, .turns, .footer-inner { padding: 0 16px; }
+            .header-meta { gap: 8px; font-size: 11px; }
+            body { font-size: 13px; }
+        }
+    </style>
+</head>
+<body>
+    <div id="root" class="loading">Loading session...</div>
+    <script>
+        // Turnshare Web Renderer
+        // Fetches session.json from a GitHub Gist and renders it.
+        // Schema: see /schema/session.schema.json
+
+        (async function() {
+            const root = document.getElementById('root');
+            // Support hash (#<gist-id>), query param (?g=<id>), and path (/g/<id>)
+            const hash = window.location.hash.replace(/^#\/?/, '');
+            const gistId = hash || new URLSearchParams(window.location.search).get('g');
+
+            if (!gistId) {
+                root.className = 'error';
+                root.textContent = 'No session ID provided. Use #<gist-id>';
+                return;
+            }
+
+            try {
+                const res = await fetch(`https://api.github.com/gists/${gistId}`);
+                if (!res.ok) throw new Error(`Gist not found (${res.status})`);
+                const gist = await res.json();
+                const sessionFile = gist.files['session.json'];
+                if (!sessionFile) throw new Error('No session.json in gist');
+
+                // Handle truncated gists (>1MB) by fetching raw URL
+                let content = sessionFile.content;
+                if (sessionFile.truncated && sessionFile.raw_url) {
+                    const rawRes = await fetch(sessionFile.raw_url);
+                    content = await rawRes.text();
+                }
+
+                const session = JSON.parse(content);
+                render(session, gist.owner);
+            } catch (e) {
+                root.className = 'error';
+                root.textContent = e.message;
+            }
+
+            function render(session, gistOwner) {
+                root.className = '';
+                const meta = session.metadata;
+                const turns = session.turns || [];
+
+                // Update page title
+                const projectLabel = meta.projectName || meta.projectPath || 'Session';
+                document.title = `${projectLabel} — Turnshare`;
+
+                root.innerHTML = '';
+
+                // Header
+                root.appendChild(renderHeader(meta, turns.length, gistOwner));
+
+                // Turns
+                const turnsEl = el('div', 'turns');
+                for (const turn of turns) {
+                    turnsEl.appendChild(renderTurn(turn));
+                }
+                root.appendChild(turnsEl);
+
+                // Footer
+                root.appendChild(renderFooter());
+            }
+
+            function renderHeader(meta, turnCount, gistOwner) {
+                const header = el('header', 'session-header');
+                const inner = el('div', 'header-inner');
+
+                // Top row: agent badge + project name
+                const top = el('div', 'header-top');
+                const badge = el('span', `agent-badge ${(meta.agent || '').replace(/\s+/g, '-')}`);
+                badge.textContent = agentLabel(meta.agent);
+                top.appendChild(badge);
+
+                if (meta.projectName || meta.projectPath) {
+                    const proj = el('span', 'header-project');
+                    proj.textContent = meta.projectName || lastPathSegment(meta.projectPath);
+                    top.appendChild(proj);
+                }
+                inner.appendChild(top);
+
+                // Meta row
+                const metaRow = el('div', 'header-meta');
+                if (meta.model) metaRow.appendChild(metaSpan('Model', meta.model));
+                if (meta.gitBranch) metaRow.appendChild(metaSpan('Branch', meta.gitBranch));
+                metaRow.appendChild(metaSpan('Turns', String(turnCount)));
+                if (meta.startedAt) metaRow.appendChild(metaSpan('Started', formatDate(meta.startedAt)));
+                if (meta.endedAt) metaRow.appendChild(metaSpan('Duration', formatDuration(meta.startedAt, meta.endedAt)));
+                if (gistOwner && gistOwner.login) metaRow.appendChild(metaSpan('Shared by', gistOwner.login));
+                inner.appendChild(metaRow);
+
+                header.appendChild(inner);
+                return header;
+            }
+
+            function renderTurn(turn) {
+                const turnEl = el('div', `turn role-${turn.role}`);
+
+                // Turn header
+                const header = el('div', 'turn-header');
+                const roleEl = el('span', 'role-indicator');
+                roleEl.textContent = turn.role;
+                header.appendChild(roleEl);
+
+                if (turn.timestamp) {
+                    const ts = el('span', 'turn-timestamp');
+                    ts.textContent = formatTime(turn.timestamp);
+                    header.appendChild(ts);
+                }
+                turnEl.appendChild(header);
+
+                // Content blocks
+                const contentEl = el('div', 'turn-content');
+                for (const block of (turn.content || [])) {
+                    contentEl.appendChild(renderContentBlock(block));
+                }
+                turnEl.appendChild(contentEl);
+
+                return turnEl;
+            }
+
+            function renderContentBlock(block) {
+                switch (block.type) {
+                    case 'text': return renderText(block.text);
+                    case 'tool_use': return renderToolUse(block);
+                    case 'tool_result': return renderToolResult(block);
+                    default: {
+                        const d = el('div', 'content-text');
+                        d.textContent = JSON.stringify(block);
+                        return d;
+                    }
+                }
+            }
+
+            function renderText(text) {
+                const container = el('div', 'content-text');
+                container.innerHTML = markdownToHtml(text);
+                return container;
+            }
+
+            function renderToolUse(block) {
+                const wrapper = el('div', 'tool-block');
+                const header = el('div', 'tool-block-header');
+                header.innerHTML = `<span class="tool-chevron">&#9654;</span><span class="tool-name">${esc(block.name)}</span><span class="tool-id">${esc(block.id || '')}</span>`;
+                header.addEventListener('click', () => wrapper.classList.toggle('open'));
+                wrapper.appendChild(header);
+
+                if (block.input) {
+                    const body = el('div', 'tool-body');
+                    const pre = document.createElement('pre');
+                    try {
+                        pre.textContent = JSON.stringify(JSON.parse(block.input), null, 2);
+                    } catch {
+                        pre.textContent = block.input;
+                    }
+                    body.appendChild(pre);
+                    wrapper.appendChild(body);
+                }
+
+                return wrapper;
+            }
+
+            function renderToolResult(block) {
+                const wrapper = el('div', 'tool-block');
+                const label = block.name ? `${block.name} result` : 'Tool result';
+                const header = el('div', 'tool-block-header');
+                header.innerHTML = `<span class="tool-chevron">&#9654;</span><span class="tool-name">${esc(label)}</span>`;
+                header.addEventListener('click', () => wrapper.classList.toggle('open'));
+                wrapper.appendChild(header);
+
+                if (block.output) {
+                    const body = el('div', 'tool-body');
+                    const pre = document.createElement('pre');
+                    pre.textContent = block.output;
+                    body.appendChild(pre);
+                    wrapper.appendChild(body);
+                }
+
+                return wrapper;
+            }
+
+            function renderFooter() {
+                const footer = el('footer', 'session-footer');
+                const inner = el('div', 'footer-inner');
+                inner.innerHTML = `<span>Shared with Turnshare</span>`;
+                footer.appendChild(inner);
+                return footer;
+            }
+
+            // ---- Markdown ----
+
+            function markdownToHtml(text) {
+                if (!text) return '';
+                let html = esc(text);
+
+                // Fenced code blocks: ```lang\n...\n```
+                html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
+                    const header = lang ? `<div class="code-block-header"><span>${lang}</span></div>` : '';
+                    return `</p><div class="code-block">${header}<pre><code>${code}</code></pre></div><p>`;
+                });
+
+                // Inline code
+                html = html.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+
+                // Headings (### before ## before #)
+                html = html.replace(/^### (.+)$/gm, '</p><h3>$1</h3><p>');
+                html = html.replace(/^## (.+)$/gm, '</p><h2>$1</h2><p>');
+                html = html.replace(/^# (.+)$/gm, '</p><h1>$1</h1><p>');
+
+                // Bold and italic
+                html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+                html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+                // Unordered lists (- item)
+                html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
+                html = html.replace(/((?:<li>.*<\/li>\n?)+)/g, '</p><ul>$1</ul><p>');
+
+                // Ordered lists (1. item)
+                html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+
+                // Links [text](url)
+                html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+
+                // Paragraphs: wrap in <p>, convert double newlines
+                html = '<p>' + html.replace(/\n\n+/g, '</p><p>') + '</p>';
+
+                // Clean up empty <p> tags
+                html = html.replace(/<p>\s*<\/p>/g, '');
+
+                return html;
+            }
+
+            // ---- Utilities ----
+
+            function el(tag, className) {
+                const e = document.createElement(tag);
+                if (className) e.className = className;
+                return e;
+            }
+
+            function esc(str) {
+                const d = document.createElement('div');
+                d.textContent = str;
+                return d.innerHTML;
+            }
+
+            function agentLabel(agent) {
+                const labels = { 'claude-code': 'Claude Code', 'codex': 'Codex', 'opencode': 'OpenCode' };
+                return labels[agent] || agent || 'Unknown';
+            }
+
+            function lastPathSegment(path) {
+                return path ? path.split('/').filter(Boolean).pop() : '';
+            }
+
+            function metaSpan(label, value) {
+                const s = document.createElement('span');
+                s.innerHTML = `<span class="meta-label">${esc(label)}</span> ${esc(value)}`;
+                return s;
+            }
+
+            function formatDate(iso) {
+                try {
+                    const d = new Date(iso);
+                    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+                } catch { return iso; }
+            }
+
+            function formatTime(iso) {
+                try {
+                    return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' });
+                } catch { return ''; }
+            }
+
+            function formatDuration(startIso, endIso) {
+                try {
+                    const ms = new Date(endIso) - new Date(startIso);
+                    if (ms < 0) return '';
+                    const s = Math.floor(ms / 1000);
+                    if (s < 60) return `${s}s`;
+                    const m = Math.floor(s / 60);
+                    if (m < 60) return `${m}m ${s % 60}s`;
+                    const h = Math.floor(m / 60);
+                    return `${h}h ${m % 60}m`;
+                } catch { return ''; }
+            }
+        })();
+    </script>
+</body>
+</html>

@@ -30,8 +30,8 @@ final class AppState: ObservableObject {
     // Create one at https://github.com/settings/applications/new (enable Device Flow)
     static let githubClientId = "REPLACE_WITH_CLIENT_ID"
 
-    // Base URL for the Turnshare web renderer
-    static let rendererBaseURL = "https://turnshare.dev/g"
+    // Base URL for the Turnshare web renderer (GitHub Pages)
+    static let rendererBaseURL = "https://nclandrei.github.io/turnshare"
 
     init() {
         self.auth = GitHubAuth(clientId: Self.githubClientId)
@@ -127,7 +127,7 @@ final class AppState: ObservableObject {
             do {
                 let session = try claudeProvider.parseSession(at: summary.filePath)
                 let gistId = try await publisher.publish(session: session)
-                let url = "\(Self.rendererBaseURL)/\(gistId)"
+                let url = "\(Self.rendererBaseURL)#\(gistId)"
 
                 // Copy URL to clipboard
                 NSPasteboard.general.clearContents()
