@@ -40,27 +40,145 @@ struct SessionListView: View {
 
             Divider()
 
-            // Footer
-            HStack {
-                Text("\(appState.filteredSessions.count) sessions")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                Spacer()
-                Button("Publish") { publishSelected() }
-                    .keyboardShortcut(.return, modifiers: .command)
-                    .disabled(selectedId == nil)
+            // Publish status
+            if appState.isPublishing {
+                HStack {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Publishing...")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                Divider()
+            } else if let url = appState.lastPublishedURL {
+                HStack {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                        .font(.caption)
+                    Text("URL copied!")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text(url)
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                Divider()
+            } else if let error = appState.publishError {
+                HStack {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(.red)
+                        .font(.caption)
+                    Text(error)
+                        .font(.caption)
+                        .foregroundColor(.red)
+                        .lineLimit(1)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                Divider()
             }
-            .padding(10)
+
+            // Auth / footer
+            FooterView(selectedId: selectedId, onPublish: publishSelected)
         }
-        .onAppear { appState.loadSessions() }
+        .onAppear {
+            appState.loadSessions()
+            appState.restoreAuth()
+        }
     }
 
     private func publishSelected() {
         guard let id = selectedId else { return }
-        // TODO: publish the selected session
-        print("Publishing session: \(id)")
+        appState.publish(sessionId: id)
     }
 }
+
+// MARK: - Footer
+
+struct FooterView: View {
+    @EnvironmentObject var appState: AppState
+    let selectedId: String?
+    let onPublish: () -> Void
+
+    var body: some View {
+        HStack {
+            if appState.isAuthenticated {
+                // Signed in
+                if let username = appState.githubUsername {
+                    Image(systemName: "person.circle.fill")
+                        .foregroundColor(.secondary)
+                        .font(.caption)
+                    Text(username)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                Button("Sign Out") { appState.signOut() }
+                    .font(.caption)
+                    .buttonStyle(.plain)
+                    .foregroundColor(.secondary)
+
+                Button("Publish") { onPublish() }
+                    .keyboardShortcut(.return, modifiers: .command)
+                    .disabled(selectedId == nil || appState.isPublishing)
+            } else if appState.isAuthenticating {
+                // Device flow in progress
+                if let code = appState.authUserCode {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Enter code on GitHub:")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text(code)
+                            .font(.system(.body, design: .monospaced))
+                            .fontWeight(.bold)
+                            .textSelection(.enabled)
+                    }
+                    Spacer()
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Connecting to GitHub...")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                }
+            } else {
+                // Not signed in
+                if let error = appState.authError {
+                    Image(systemName: "exclamationmark.triangle")
+                        .foregroundColor(.red)
+                        .font(.caption)
+                    Text(error)
+                        .font(.caption)
+                        .foregroundColor(.red)
+                        .lineLimit(1)
+                    Spacer()
+                }
+
+                Text("\(appState.filteredSessions.count) sessions")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Spacer()
+                Button("Sign in with GitHub") { appState.startSignIn() }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+            }
+        }
+        .padding(10)
+    }
+}
+
+// MARK: - Session Row
 
 struct SessionRowView: View {
     let session: SessionSummary
@@ -68,7 +186,6 @@ struct SessionRowView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                // Agent badge
                 Text(agentLabel)
                     .font(.caption2)
                     .fontWeight(.medium)

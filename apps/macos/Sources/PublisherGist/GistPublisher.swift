@@ -2,13 +2,15 @@ import Foundation
 import SessionCore
 
 public struct GistPublisher {
-    private var token: String?
+    private let auth: GitHubAuth
 
-    public init() {}
+    public init(auth: GitHubAuth) {
+        self.auth = auth
+    }
 
     /// Publish a session to a GitHub Gist. Returns the gist ID.
     public func publish(session: Session) async throws -> String {
-        guard let token = token else {
+        guard let token = await auth.token else {
             throw GistError.notAuthenticated
         }
 
@@ -40,7 +42,7 @@ public struct GistPublisher {
 
         var request = URLRequest(url: URL(string: "https://api.github.com/gists")!)
         request.httpMethod = "POST"
-        request.setValue("token \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("turnshare", forHTTPHeaderField: "User-Agent")
         request.httpBody = body
@@ -57,10 +59,6 @@ public struct GistPublisher {
         }
 
         return gistId
-    }
-
-    public mutating func authenticate(token: String) {
-        self.token = token
     }
 }
 
