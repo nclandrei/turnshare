@@ -26,8 +26,6 @@ final class AppState: ObservableObject {
     private let auth: GitHubAuth
     private let publisher: GistPublisher
 
-    // TODO: Replace with your GitHub OAuth App client_id
-    // Create one at https://github.com/settings/applications/new (enable Device Flow)
     static let githubClientId = "Ov23liMEqPKk3wK68g1w"
 
     // Base URL for the Turnshare web renderer (GitHub Pages)
