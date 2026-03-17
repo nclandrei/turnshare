@@ -1,9 +1,11 @@
 import SwiftUI
 import SessionCore
+import HotKey
 
 struct SessionListView: View {
     @EnvironmentObject var appState: AppState
     @State private var selectedId: String?
+    @State private var showSettings = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -84,8 +86,26 @@ struct SessionListView: View {
                 Divider()
             }
 
+            // Settings row
+            if showSettings {
+                HStack {
+                    HotKeyRecorderView(
+                        currentCombo: HotKeyConfig.shared.keyCombo,
+                        onRecord: { combo in
+                            if let delegate = NSApp.delegate as? AppDelegate {
+                                delegate.updateHotKey(combo)
+                            }
+                        }
+                    )
+                    Spacer()
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                Divider()
+            }
+
             // Auth / footer
-            FooterView(selectedId: selectedId, onPublish: publishSelected)
+            FooterView(selectedId: selectedId, showSettings: $showSettings, onPublish: publishSelected)
         }
         .onAppear {
             appState.loadSessions()
@@ -104,10 +124,18 @@ struct SessionListView: View {
 struct FooterView: View {
     @EnvironmentObject var appState: AppState
     let selectedId: String?
+    @Binding var showSettings: Bool
     let onPublish: () -> Void
 
     var body: some View {
         HStack {
+            Button(action: { showSettings.toggle() }) {
+                Image(systemName: "gearshape")
+                    .foregroundColor(showSettings ? .accentColor : .secondary)
+                    .font(.caption)
+            }
+            .buttonStyle(.plain)
+
             if appState.isAuthenticated {
                 // Signed in
                 if let username = appState.githubUsername {

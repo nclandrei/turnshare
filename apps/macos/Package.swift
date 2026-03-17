@@ -19,5 +19,11 @@ let package = Package(
         .target(name: "SessionCore"),
         .target(name: "ProviderClaude", dependencies: ["SessionCore"]),
         .target(name: "PublisherGist", dependencies: ["SessionCore"]),
+
+        // Tests
+        .testTarget(name: "SessionCoreTests", dependencies: ["SessionCore"]),
+        .testTarget(name: "ProviderClaudeTests", dependencies: ["ProviderClaude", "SessionCore"]),
+        .testTarget(name: "PublisherGistTests", dependencies: ["PublisherGist", "SessionCore"]),
+        .testTarget(name: "TurnshareTests", dependencies: ["SessionCore", "HotKey"]),
     ]
 )
