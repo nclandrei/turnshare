@@ -508,147 +508,10 @@
                 return footer;
             }
 
-            // ---- Markdown ----
-
-            function markdownToHtml(text) {
-                if (!text) return '';
-                let html = esc(text);
-
-                // Fenced code blocks: ```lang\n...\n```
-                html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
-                    const highlighted = highlight(code, lang);
-                    const headerHtml = `<div class="code-block-header"><span>${lang || 'text'}</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>`;
-                    return `</p><div class="code-block">${headerHtml}<pre><code>${highlighted}</code></pre></div><p>`;
-                });
-
-                // Inline code
-                html = html.replace(/`([^`\n]+)`/g, '<code>$1</code>');
-
-                // Headings (### before ## before #)
-                html = html.replace(/^### (.+)$/gm, '</p><h3>$1</h3><p>');
-                html = html.replace(/^## (.+)$/gm, '</p><h2>$1</h2><p>');
-                html = html.replace(/^# (.+)$/gm, '</p><h1>$1</h1><p>');
-
-                // Bold and italic
-                html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-                html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-
-                // Unordered lists (- item)
-                html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
-                html = html.replace(/((?:<li>.*<\/li>\n?)+)/g, '</p><ul>$1</ul><p>');
-
-                // Ordered lists (1. item)
-                html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
-
-                // Links [text](url)
-                html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
-
-                // Paragraphs: wrap in <p>, convert double newlines
-                html = '<p>' + html.replace(/\n\n+/g, '</p><p>') + '</p>';
-
-                // Clean up empty <p> tags
-                html = html.replace(/<p>\s*<\/p>/g, '');
-
-                return html;
-            }
-
-            // ---- Utilities ----
-
-            function el(tag, className) {
-                const e = document.createElement(tag);
-                if (className) e.className = className;
-                return e;
-            }
-
-            function esc(str) {
-                const d = document.createElement('div');
-                d.textContent = str;
-                return d.innerHTML;
-            }
-
-            function agentLabel(agent) {
-                const labels = { 'claude-code': 'Claude Code', 'codex': 'Codex', 'opencode': 'OpenCode' };
-                return labels[agent] || agent || 'Unknown';
-            }
-
-            function lastPathSegment(path) {
-                return path ? path.split('/').filter(Boolean).pop() : '';
-            }
-
-            function metaSpan(label, value) {
-                const s = document.createElement('span');
-                s.innerHTML = `<span class="meta-label">${esc(label)}</span> ${esc(value)}`;
-                return s;
-            }
-
-            function formatDate(iso) {
-                try {
-                    const d = new Date(iso);
-                    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
-                } catch { return iso; }
-            }
-
-            function formatTime(iso) {
-                try {
-                    return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' });
-                } catch { return ''; }
-            }
-
-            function formatDuration(startIso, endIso) {
-                try {
-                    const ms = new Date(endIso) - new Date(startIso);
-                    if (ms < 0) return '';
-                    const s = Math.floor(ms / 1000);
-                    if (s < 60) return `${s}s`;
-                    const m = Math.floor(s / 60);
-                    if (m < 60) return `${m}m ${s % 60}s`;
-                    const h = Math.floor(m / 60);
-                    return `${h}h ${m % 60}m`;
-                } catch { return ''; }
-            }
-
             // ---- Syntax Highlighting ----
             // Minimal regex-based highlighter. Covers the common tokens
             // in JS/TS, Python, Bash, Go, Rust, Swift, JSON, and generic code.
             // Already-escaped HTML entities from esc() are preserved.
-
-            const LANG_RULES = {
-                javascript: tokenRulesJS(), typescript: tokenRulesJS(),
-                js: tokenRulesJS(), ts: tokenRulesJS(), jsx: tokenRulesJS(), tsx: tokenRulesJS(),
-                python: tokenRulesPy(), py: tokenRulesPy(),
-                bash: tokenRulesSh(), sh: tokenRulesSh(), shell: tokenRulesSh(), zsh: tokenRulesSh(), fish: tokenRulesSh(),
-                json: tokenRulesJSON(),
-                go: tokenRulesGo(),
-                rust: tokenRulesRust(), rs: tokenRulesRust(),
-                swift: tokenRulesSwift(),
-                css: tokenRulesCSS(),
-                html: tokenRulesHTML(), xml: tokenRulesHTML(),
-                sql: tokenRulesSQL(),
-            };
-
-            function highlight(code, lang) {
-                const rules = LANG_RULES[(lang || '').toLowerCase()];
-                if (!rules) return code; // no rules = return as-is (already escaped)
-                return applyRules(code, rules);
-            }
-
-            function applyRules(code, rules) {
-                // Build one combined regex from all rules
-                const parts = rules.map((r, i) => `(${r.pattern.source})`);
-                const combined = new RegExp(parts.join('|'), 'gm');
-                return code.replace(combined, function() {
-                    const args = arguments;
-                    // Find which group matched
-                    let offset = 1;
-                    for (let i = 0; i < rules.length; i++) {
-                        if (args[offset] !== undefined) {
-                            return `<span class="${rules[i].cls}">${args[offset]}</span>`;
-                        }
-                        offset += rules[i].groups + 1;
-                    }
-                    return args[0];
-                });
-            }
 
             function r(pattern, cls, groups) { return { pattern, cls, groups: groups || 0 }; }
 
@@ -748,6 +611,148 @@
                 r(/\b(INTEGER|INT|BIGINT|SMALLINT|TINYINT|FLOAT|DOUBLE|DECIMAL|NUMERIC|CHAR|VARCHAR|TEXT|BLOB|DATE|TIME|TIMESTAMP|DATETIME|BOOLEAN|SERIAL|UUID)\b/i, 'sh-type'),
                 r(/\b\d+\.?\d*\b/, 'sh-number'),
             ]; }
+
+            var _langRules;
+            function getLangRules() {
+                if (!_langRules) {
+                    _langRules = {
+                        javascript: tokenRulesJS(), typescript: tokenRulesJS(),
+                        js: tokenRulesJS(), ts: tokenRulesJS(), jsx: tokenRulesJS(), tsx: tokenRulesJS(),
+                        python: tokenRulesPy(), py: tokenRulesPy(),
+                        bash: tokenRulesSh(), sh: tokenRulesSh(), shell: tokenRulesSh(), zsh: tokenRulesSh(), fish: tokenRulesSh(),
+                        json: tokenRulesJSON(),
+                        go: tokenRulesGo(),
+                        rust: tokenRulesRust(), rs: tokenRulesRust(),
+                        swift: tokenRulesSwift(),
+                        css: tokenRulesCSS(),
+                        html: tokenRulesHTML(), xml: tokenRulesHTML(),
+                        sql: tokenRulesSQL(),
+                    };
+                }
+                return _langRules;
+            }
+
+            function highlight(code, lang) {
+                const rules = getLangRules()[(lang || '').toLowerCase()];
+                if (!rules) return code;
+                return applyRules(code, rules);
+            }
+
+            function applyRules(code, rules) {
+                const parts = rules.map((r, i) => `(${r.pattern.source})`);
+                const combined = new RegExp(parts.join('|'), 'gm');
+                return code.replace(combined, function() {
+                    const args = arguments;
+                    let offset = 1;
+                    for (let i = 0; i < rules.length; i++) {
+                        if (args[offset] !== undefined) {
+                            return `<span class="${rules[i].cls}">${args[offset]}</span>`;
+                        }
+                        offset += rules[i].groups + 1;
+                    }
+                    return args[0];
+                });
+            }
+
+            // ---- Markdown ----
+
+            function markdownToHtml(text) {
+                if (!text) return '';
+                let html = esc(text);
+
+                // Fenced code blocks: ```lang\n...\n```
+                html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
+                    const highlighted = highlight(code, lang);
+                    const headerHtml = `<div class="code-block-header"><span>${lang || 'text'}</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>`;
+                    return `</p><div class="code-block">${headerHtml}<pre><code>${highlighted}</code></pre></div><p>`;
+                });
+
+                // Inline code
+                html = html.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+
+                // Headings (### before ## before #)
+                html = html.replace(/^### (.+)$/gm, '</p><h3>$1</h3><p>');
+                html = html.replace(/^## (.+)$/gm, '</p><h2>$1</h2><p>');
+                html = html.replace(/^# (.+)$/gm, '</p><h1>$1</h1><p>');
+
+                // Bold and italic
+                html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+                html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+                // Unordered lists (- item)
+                html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
+                html = html.replace(/((?:<li>.*<\/li>\n?)+)/g, '</p><ul>$1</ul><p>');
+
+                // Ordered lists (1. item)
+                html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+
+                // Links [text](url)
+                html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+
+                // Paragraphs: wrap in <p>, convert double newlines
+                html = '<p>' + html.replace(/\n\n+/g, '</p><p>') + '</p>';
+
+                // Clean up empty <p> tags
+                html = html.replace(/<p>\s*<\/p>/g, '');
+
+                return html;
+            }
+
+            // ---- Utilities ----
+
+            function el(tag, className) {
+                const e = document.createElement(tag);
+                if (className) e.className = className;
+                return e;
+            }
+
+            function esc(str) {
+                const d = document.createElement('div');
+                d.textContent = str;
+                return d.innerHTML;
+            }
+
+            function agentLabel(agent) {
+                const labels = { 'claude-code': 'Claude Code', 'codex': 'Codex', 'opencode': 'OpenCode' };
+                return labels[agent] || agent || 'Unknown';
+            }
+
+            function lastPathSegment(path) {
+                return path ? path.split('/').filter(Boolean).pop() : '';
+            }
+
+            function metaSpan(label, value) {
+                const s = document.createElement('span');
+                s.innerHTML = `<span class="meta-label">${esc(label)}</span> ${esc(value)}`;
+                return s;
+            }
+
+            function formatDate(iso) {
+                try {
+                    const d = new Date(iso);
+                    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+                } catch { return iso; }
+            }
+
+            function formatTime(iso) {
+                try {
+                    return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' });
+                } catch { return ''; }
+            }
+
+            function formatDuration(startIso, endIso) {
+                try {
+                    const ms = new Date(endIso) - new Date(startIso);
+                    if (ms < 0) return '';
+                    const s = Math.floor(ms / 1000);
+                    if (s < 60) return `${s}s`;
+                    const m = Math.floor(s / 60);
+                    if (m < 60) return `${m}m ${s % 60}s`;
+                    const h = Math.floor(m / 60);
+                    return `${h}h ${m % 60}m`;
+                } catch { return ''; }
+            }
+
         })();
 
         // Global copy handler (needs to be outside the IIFE)
