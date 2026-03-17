@@ -28,7 +28,7 @@ final class AppState: ObservableObject {
 
     // TODO: Replace with your GitHub OAuth App client_id
     // Create one at https://github.com/settings/applications/new (enable Device Flow)
-    static let githubClientId = "REPLACE_WITH_CLIENT_ID"
+    static let githubClientId = "Ov23liMEqPKk3wK68g1w"
 
     // Base URL for the Turnshare web renderer (GitHub Pages)
     static let rendererBaseURL = "https://nclandrei.github.io/turnshare"
