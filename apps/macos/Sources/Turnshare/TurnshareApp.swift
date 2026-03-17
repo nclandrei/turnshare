@@ -26,7 +26,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Create status bar item
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "arrow.up.message", accessibilityDescription: "Turnshare")
+            if let icon = Bundle.module.image(forResource: "menubar-icon") {
+                icon.isTemplate = true
+                icon.size = NSSize(width: 18, height: 18)
+                button.image = icon
+            }
             button.action = #selector(togglePopover)
             button.target = self
         }

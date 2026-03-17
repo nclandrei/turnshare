@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Share arrow -->
+  <path d="M512 70 L694 300 L577 300 L577 450 L447 450 L447 300 L330 300 Z" fill="#000000"/>
+  <!-- Message bubble -->
+  <rect x="172" y="440" width="680" height="400" rx="90" fill="#000000"/>
+  <!-- Bubble tail -->
+  <path d="M300 840 L385 840 L210 970 Z" fill="#000000"/>
+</svg>

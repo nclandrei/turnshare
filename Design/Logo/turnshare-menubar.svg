@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Simplified for menu bar: no tail, bolder proportions -->
+  <!-- Share arrow -->
+  <path d="M512 60 L720 320 L590 320 L590 470 L434 470 L434 320 L304 320 Z" fill="#000000"/>
+  <!-- Message block -->
+  <rect x="152" y="460" width="720" height="430" rx="95" fill="#000000"/>
+</svg>
