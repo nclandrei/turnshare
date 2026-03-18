@@ -376,17 +376,21 @@ struct PreviewTurnView: View {
                 .fontWeight(.semibold)
                 .foregroundColor(roleColor)
 
-            if turn.role == .tool {
-                // Tool turns: just show tool name, dimmed
-                Text(turnText)
-                    .font(.callout)
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
-            } else {
-                Text(turnText)
-                    .font(.body)
-                    .foregroundColor(.primary)
-                    .fixedSize(horizontal: false, vertical: true)
+            ForEach(Array(turn.content.enumerated()), id: \.offset) { _, block in
+                switch block {
+                case .text(let text):
+                    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !trimmed.isEmpty {
+                        Text(trimmed)
+                            .font(.body)
+                            .foregroundColor(.primary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                case .toolUse(let toolUse):
+                    ToolUsePill(toolUse: toolUse)
+                case .toolResult:
+                    EmptyView()
+                }
             }
         }
     }
@@ -406,23 +410,51 @@ struct PreviewTurnView: View {
         case .tool: return .gray
         }
     }
+}
 
-    private var turnText: String {
-        Self.extractText(from: turn)
-    }
+private struct ToolUsePill: View {
+    let toolUse: ToolUse
 
-    /// Extract a human-readable summary from a turn's content blocks.
-    static func extractText(from turn: Turn) -> String {
-        let texts = turn.content.compactMap { block -> String? in
-            switch block {
-            case .text(let text):
-                return text
-            case .toolUse(let toolUse):
-                return "[\(toolUse.name)]"
-            case .toolResult(let result):
-                return result.output.isEmpty ? nil : String(result.output.prefix(100))
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "bolt.fill")
+                .font(.caption2)
+            Text(toolUse.name)
+                .font(.caption)
+                .fontWeight(.medium)
+            if let snippet = inputSnippet {
+                Text(snippet)
+                    .font(.caption)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
             }
         }
-        return texts.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+        .foregroundColor(.secondary)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(Color.secondary.opacity(0.1))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+    }
+
+    private var inputSnippet: String? {
+        guard let input = toolUse.input, !input.isEmpty,
+              let data = input.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return nil
+        }
+
+        // Extract the most meaningful field for common tools
+        let value: String? =
+            (json["command"] as? String) ??     // Bash
+            (json["file_path"] as? String) ??   // Read, Write, Edit
+            (json["pattern"] as? String) ??     // Glob, Grep
+            (json["query"] as? String) ??       // WebSearch
+            (json["url"] as? String)            // WebFetch
+
+        guard let raw = value, !raw.isEmpty else { return nil }
+        let clean = raw
+            .replacingOccurrences(of: "\n", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return String(clean.prefix(60))
     }
 }
