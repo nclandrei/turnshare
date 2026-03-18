@@ -22,6 +22,9 @@ final class AppState: ObservableObject {
     @Published var lastPublishedURL: String?
     @Published var publishError: String?
 
+    /// Called after a publish is initiated (panel should close).
+    var onPublishInitiated: (() -> Void)?
+
     private let claudeProvider = ClaudeProvider()
     private let auth: GitHubAuth
     private let publisher: GistPublisher
@@ -115,11 +118,25 @@ final class AppState: ObservableObject {
 
     // MARK: - Publish
 
+    /// Publish the session at the given index in `filteredSessions`.
+    /// Returns `true` if the publish was initiated (panel should close).
+    @discardableResult
+    func publishByIndex(_ index: Int) -> Bool {
+        let list = filteredSessions
+        guard index >= 0, index < list.count else { return false }
+        guard isAuthenticated, !isPublishing else { return false }
+        publish(sessionId: list[index].id)
+        return true
+    }
+
     func publish(sessionId: String) {
         guard let summary = sessions.first(where: { $0.id == sessionId }) else { return }
         isPublishing = true
         publishError = nil
         lastPublishedURL = nil
+
+        // Close the panel immediately (Maccy-style)
+        onPublishInitiated?()
 
         Task {
             do {

@@ -45,7 +45,64 @@ final class AppStateTests: XCTestCase {
         XCTAssertTrue(filtered.isEmpty)
     }
 
+    // MARK: - Publish by Index
+
+    func testPublishByIndexReturnsCorrectSession() {
+        let sessions = makeSessions()
+        // Index 0 → first session
+        let target = sessionAtIndex(0, sessions: sessions, query: "")
+        XCTAssertEqual(target?.id, "1")
+        // Index 2 → third session
+        let target2 = sessionAtIndex(2, sessions: sessions, query: "")
+        XCTAssertEqual(target2?.id, "3")
+    }
+
+    func testPublishByIndexOutOfBoundsReturnsNil() {
+        let sessions = makeSessions()
+        XCTAssertNil(sessionAtIndex(-1, sessions: sessions, query: ""))
+        XCTAssertNil(sessionAtIndex(3, sessions: sessions, query: ""))
+        XCTAssertNil(sessionAtIndex(99, sessions: sessions, query: ""))
+    }
+
+    func testPublishByIndexRespectsFilter() {
+        let sessions = makeSessions()
+        // Filter to "cinetry" → only session id "2"
+        let target = sessionAtIndex(0, sessions: sessions, query: "cinetry")
+        XCTAssertEqual(target?.id, "2")
+        // Index 1 is out of bounds after filtering
+        XCTAssertNil(sessionAtIndex(1, sessions: sessions, query: "cinetry"))
+    }
+
+    func testPublishByIndexWithEmptyListReturnsNil() {
+        let sessions: [SessionSummary] = []
+        XCTAssertNil(sessionAtIndex(0, sessions: sessions, query: ""))
+    }
+
+    func testShortcutIndexAssignment() {
+        let sessions = makeSessions()
+        // First 9 items get shortcut indices 1-9, the rest get nil
+        for i in 0..<min(9, sessions.count) {
+            XCTAssertEqual(shortcutIndex(for: i), i + 1)
+        }
+        // Items beyond index 8 get nil
+        XCTAssertNil(shortcutIndex(for: 9))
+        XCTAssertNil(shortcutIndex(for: 100))
+    }
+
     // MARK: - Helpers
+
+    /// Mirrors the shortcut index assignment logic: items 0-8 get 1-9, rest get nil.
+    private func shortcutIndex(for index: Int) -> Int? {
+        index < 9 ? index + 1 : nil
+    }
+
+    /// Mirrors AppState.publishByIndex — resolves the session at a given index
+    /// in the filtered list, returning nil for out-of-bounds.
+    private func sessionAtIndex(_ index: Int, sessions: [SessionSummary], query: String) -> SessionSummary? {
+        let list = filterSessions(sessions, query: query)
+        guard index >= 0, index < list.count else { return nil }
+        return list[index]
+    }
 
     /// Mirrors AppState.filteredSessions logic without requiring @MainActor.
     private func filterSessions(_ sessions: [SessionSummary], query: String) -> [SessionSummary] {

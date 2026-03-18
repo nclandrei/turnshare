@@ -42,6 +42,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             rootView: SessionListView().environmentObject(appState)
         )
 
+        // Wire Cmd+1-9 from panel to AppState
+        panel.onPublishIndex = { [weak self] index in
+            self?.appState.publishByIndex(index)
+        }
+
+        // Close panel when a publish is initiated
+        appState.onPublishInitiated = { [weak self] in
+            self?.hidePanel()
+        }
+
         // Register global hotkey
         registerHotKey()
     }
@@ -103,6 +113,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 // MARK: - Floating Panel
 
 final class FloatingPanel: NSPanel {
+    /// Called with the 0-based index when the user presses Cmd+1…9.
+    var onPublishIndex: ((Int) -> Void)?
+
     init<Content: View>(rootView: Content) {
         super.init(
             contentRect: NSRect(x: 0, y: 0, width: 400, height: 500),
@@ -145,6 +158,20 @@ final class FloatingPanel: NSPanel {
 
     // Allow the panel to become key so text fields work
     override var canBecomeKey: Bool { true }
+
+    // Handle Cmd+1 through Cmd+9 to quick-publish
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if event.modifierFlags.contains(.command),
+           let chars = event.charactersIgnoringModifiers,
+           chars.count == 1,
+           let num = Int(chars),
+           num >= 1, num <= 9
+        {
+            onPublishIndex?(num - 1)
+            return true
+        }
+        return super.performKeyEquivalent(with: event)
+    }
 
     // Close on Escape
     override func cancelOperation(_ sender: Any?) {

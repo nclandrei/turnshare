@@ -4,7 +4,6 @@ import HotKey
 
 struct SessionListView: View {
     @EnvironmentObject var appState: AppState
-    @State private var selectedId: String?
     @State private var showSettings = false
 
     var body: some View {
@@ -15,7 +14,6 @@ struct SessionListView: View {
                     .foregroundColor(.secondary)
                 TextField("Search sessions...", text: $appState.searchText)
                     .textFieldStyle(.plain)
-                    .onSubmit { publishSelected() }
             }
             .padding(10)
             .background(.ultraThinMaterial)
@@ -33,9 +31,15 @@ struct SessionListView: View {
                     .foregroundColor(.secondary)
                 Spacer()
             } else {
-                List(appState.filteredSessions, selection: $selectedId) { session in
-                    SessionRowView(session: session)
-                        .tag(session.id)
+                List {
+                    ForEach(
+                        Array(appState.filteredSessions.enumerated()),
+                        id: \.element.id
+                    ) { index, session in
+                        SessionRowView(session: session, shortcutIndex: index < 9 ? index + 1 : nil)
+                            .contentShape(Rectangle())
+                            .onTapGesture { appState.publishByIndex(index) }
+                    }
                 }
                 .listStyle(.plain)
             }
@@ -105,7 +109,7 @@ struct SessionListView: View {
             }
 
             // Auth / footer
-            FooterView(selectedId: selectedId, showSettings: $showSettings, onPublish: publishSelected)
+            FooterView(showSettings: $showSettings)
         }
         .onAppear {
             appState.loadSessions()
@@ -113,19 +117,13 @@ struct SessionListView: View {
         }
     }
 
-    private func publishSelected() {
-        guard let id = selectedId else { return }
-        appState.publish(sessionId: id)
-    }
 }
 
 // MARK: - Footer
 
 struct FooterView: View {
     @EnvironmentObject var appState: AppState
-    let selectedId: String?
     @Binding var showSettings: Bool
-    let onPublish: () -> Void
 
     var body: some View {
         HStack {
@@ -153,10 +151,6 @@ struct FooterView: View {
                     .font(.caption)
                     .buttonStyle(.plain)
                     .foregroundColor(.secondary)
-
-                Button("Publish") { onPublish() }
-                    .keyboardShortcut(.return, modifiers: .command)
-                    .disabled(selectedId == nil || appState.isPublishing)
             } else if appState.isAuthenticating {
                 // Device flow in progress
                 if let code = appState.authUserCode {
@@ -210,49 +204,61 @@ struct FooterView: View {
 
 struct SessionRowView: View {
     let session: SessionSummary
+    /// 1-based shortcut number (nil for items beyond 9).
+    let shortcutIndex: Int?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text(agentLabel)
-                    .font(.caption2)
-                    .fontWeight(.medium)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(agentColor.opacity(0.15))
-                    .foregroundColor(agentColor)
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
+        HStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(agentLabel)
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(agentColor.opacity(0.15))
+                        .foregroundColor(agentColor)
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
 
-                if let project = session.projectName {
-                    Text(project)
-                        .font(.headline)
-                        .lineLimit(1)
-                }
+                    if let project = session.projectName {
+                        Text(project)
+                            .font(.headline)
+                            .lineLimit(1)
+                    }
 
-                if let branch = session.gitBranch {
-                    Text(branch)
+                    if let branch = session.gitBranch {
+                        Text(branch)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    }
+
+                    Spacer()
+
+                    Text(timeAgo)
                         .font(.caption)
                         .foregroundColor(.secondary)
-                        .lineLimit(1)
                 }
 
-                Spacer()
+                if let message = session.firstUserMessage {
+                    Text(message)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .lineLimit(2)
+                }
 
-                Text(timeAgo)
+                Text("\(session.turnCount) turns")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+
+            // Shortcut hint (⌘1, ⌘2, …)
+            if let idx = shortcutIndex {
+                Text("⌘\(idx)")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.tertiary)
+                    .frame(minWidth: 28, alignment: .trailing)
             }
-
-            if let message = session.firstUserMessage {
-                Text(message)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .lineLimit(2)
-            }
-
-            Text("\(session.turnCount) turns")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
         }
         .padding(.vertical, 4)
     }
