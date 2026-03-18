@@ -41,6 +41,9 @@ final class AppState: ObservableObject {
     /// Called after a publish is initiated (panel should close).
     var onPublishInitiated: (() -> Void)?
 
+    /// Called when publish completes (success or error) — drives HUD dismiss timer.
+    var onPublishCompleted: (() -> Void)?
+
     /// Called when the hovered preview session changes (nil = hide preview panel).
     var onPreviewChanged: ((String?) -> Void)?
 
@@ -280,9 +283,11 @@ final class AppState: ObservableObject {
 
                 self.lastPublishedURL = url
                 self.isPublishing = false
+                self.onPublishCompleted?()
             } catch {
                 self.publishError = error.localizedDescription
                 self.isPublishing = false
+                self.onPublishCompleted?()
             }
         }
     }

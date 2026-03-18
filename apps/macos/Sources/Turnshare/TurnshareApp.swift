@@ -19,6 +19,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var panel: FloatingPanel!
     private var previewPanel: NSPanel!
+    private var hudPanel: NSPanel!
+    private var hudDismissTask: Task<Void, Never>?
     private var hotKey: HotKey?
     private let appState = AppState()
     private let hotKeyConfig = HotKeyConfig.shared
@@ -73,9 +75,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Create preview panel (side panel for hover preview)
         previewPanel = Self.makePreviewPanel(appState: appState)
 
-        // Close panel when a publish is initiated
+        // Create HUD panel (publish status overlay)
+        hudPanel = Self.makeHUDPanel(appState: appState)
+
+        // Close panel and show HUD when a publish is initiated
         appState.onPublishInitiated = { [weak self] in
             self?.hidePanel()
+            self?.showHUD()
+        }
+
+        // Schedule HUD dismiss when publish completes
+        appState.onPublishCompleted = { [weak self] in
+            guard let self else { return }
+            let delay: UInt64 = self.appState.publishError != nil
+                ? 3_000_000_000  // 3s for errors
+                : 2_000_000_000  // 2s for success
+            self.scheduleHUDDismiss(after: delay)
         }
 
         // Show/hide preview panel when hovering sessions
@@ -223,6 +238,76 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         panel.contentView = visualEffect
         return panel
+    }
+
+    // MARK: - Publish HUD
+
+    private static func makeHUDPanel(appState: AppState) -> NSPanel {
+        let panel = NSPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 220, height: 36),
+            styleMask: [.nonactivatingPanel, .borderless],
+            backing: .buffered,
+            defer: false
+        )
+        panel.isFloatingPanel = true
+        panel.level = .floating
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = true
+
+        let hostingView = NSHostingView(
+            rootView: PublishHUDView().environmentObject(appState)
+        )
+        hostingView.wantsLayer = true
+        hostingView.layer?.cornerRadius = 10
+        hostingView.layer?.masksToBounds = true
+
+        let visualEffect = NSVisualEffectView()
+        visualEffect.material = .popover
+        visualEffect.state = .active
+        visualEffect.wantsLayer = true
+        visualEffect.layer?.cornerRadius = 10
+        visualEffect.layer?.masksToBounds = true
+        visualEffect.addSubview(hostingView)
+
+        hostingView.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            hostingView.topAnchor.constraint(equalTo: visualEffect.topAnchor),
+            hostingView.bottomAnchor.constraint(equalTo: visualEffect.bottomAnchor),
+            hostingView.leadingAnchor.constraint(equalTo: visualEffect.leadingAnchor),
+            hostingView.trailingAnchor.constraint(equalTo: visualEffect.trailingAnchor),
+        ])
+
+        panel.contentView = visualEffect
+        return panel
+    }
+
+    private func showHUD() {
+        guard let button = statusItem.button,
+              let buttonWindow = button.window else { return }
+
+        let buttonFrame = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
+        let hudSize = hudPanel.frame.size
+        let x = buttonFrame.midX - hudSize.width / 2
+        let y = buttonFrame.minY - hudSize.height - 4
+
+        hudPanel.setFrameOrigin(NSPoint(x: x, y: y))
+        hudPanel.orderFront(nil)
+    }
+
+    private func hideHUD() {
+        hudDismissTask?.cancel()
+        hudDismissTask = nil
+        hudPanel.orderOut(nil)
+    }
+
+    private func scheduleHUDDismiss(after nanoseconds: UInt64) {
+        hudDismissTask?.cancel()
+        hudDismissTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: nanoseconds)
+            guard !Task.isCancelled else { return }
+            self.hudPanel.orderOut(nil)
+        }
     }
 }
 
