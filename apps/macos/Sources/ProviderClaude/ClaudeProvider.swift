@@ -10,31 +10,37 @@ public struct ClaudeProvider {
             .appendingPathComponent("projects")
     }
 
-    /// Scan all Claude Code projects and return session summaries, sorted by most recent first.
-    public func listSessions(limit: Int = 50) throws -> [SessionSummary] {
+    /// Return all JSONL session file URLs sorted by modification date (most recent first).
+    /// This is cheap — only reads filesystem metadata, no file contents.
+    public func listSessionFiles() throws -> [URL] {
         let fm = FileManager.default
         guard fm.fileExists(atPath: claudeDir.path) else { return [] }
 
         let projectDirs = try fm.contentsOfDirectory(at: claudeDir, includingPropertiesForKeys: nil)
-        var summaries: [SessionSummary] = []
+        var files: [(url: URL, modDate: Date)] = []
 
         for projectDir in projectDirs {
             guard projectDir.hasDirectoryPath else { continue }
 
-            let files = try fm.contentsOfDirectory(at: projectDir, includingPropertiesForKeys: [.contentModificationDateKey])
-            let jsonlFiles = files.filter { $0.pathExtension == "jsonl" }
+            let contents = try fm.contentsOfDirectory(
+                at: projectDir,
+                includingPropertiesForKeys: [.contentModificationDateKey]
+            )
 
-            for file in jsonlFiles {
-                if let summary = try? scanSessionFile(file, projectDir: projectDir) {
-                    summaries.append(summary)
-                }
+            for file in contents where file.pathExtension == "jsonl" {
+                let modDate = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast
+                files.append((file, modDate))
             }
         }
 
-        return summaries
-            .sorted { $0.startedAt > $1.startedAt }
-            .prefix(limit)
-            .map { $0 }
+        return files
+            .sorted { $0.modDate > $1.modDate }
+            .map(\.url)
+    }
+
+    /// Scan a single JSONL file and return its summary. Returns nil if the file can't be parsed.
+    public func scanSession(at file: URL) -> SessionSummary? {
+        try? scanSessionFile(file, projectDir: file.deletingLastPathComponent())
     }
 
     /// Parse a full session from a JSONL file into the normalized Turnshare format.

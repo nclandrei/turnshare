@@ -36,13 +36,17 @@ struct SessionListView: View {
                         Array(appState.filteredSessions.enumerated()),
                         id: \.element.id
                     ) { index, session in
-                        SessionRowView(
-                            session: session,
-                            shortcutIndex: index < 9 ? index + 1 : nil,
-                            isSelected: appState.selectedSessionIndex == index
-                        )
-                        .contentShape(Rectangle())
-                        .onTapGesture { appState.publishByIndex(index) }
+                        Button {
+                            appState.publishByIndex(index)
+                        } label: {
+                            SessionRowView(
+                                session: session,
+                                shortcutIndex: index < 9 ? index + 1 : nil,
+                                isSelected: appState.selectedSessionIndex == index
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .onAppear { appState.loadMoreIfNeeded(currentSession: session) }
                         .onHover { hovering in
                             if hovering {
                                 appState.loadPreview(for: session.id)

@@ -18,16 +18,15 @@ final class ClaudeProviderTests: XCTestCase {
         super.tearDown()
     }
 
-    // MARK: - Session Listing
+    // MARK: - Session File Listing
 
-    func testListSessionsEmptyDir() throws {
+    func testListSessionFilesEmptyDir() throws {
         let provider = ClaudeProvider(claudeDir: tempDir)
-        let sessions = try provider.listSessions()
-        XCTAssertTrue(sessions.isEmpty)
+        let files = try provider.listSessionFiles()
+        XCTAssertTrue(files.isEmpty)
     }
 
-    func testListSessionsFindsJSONLFiles() throws {
-        // Create a project dir with a JSONL session file
+    func testListSessionFilesFindsJSONLFiles() throws {
         let projectDir = tempDir.appendingPathComponent("-Users-test-project")
         try FileManager.default.createDirectory(at: projectDir, withIntermediateDirectories: true)
 
@@ -36,12 +35,12 @@ final class ClaudeProviderTests: XCTestCase {
         try jsonl.write(to: sessionFile, atomically: true, encoding: .utf8)
 
         let provider = ClaudeProvider(claudeDir: tempDir)
-        let sessions = try provider.listSessions()
-        XCTAssertEqual(sessions.count, 1)
-        XCTAssertEqual(sessions.first?.id, "sess-1")
+        let files = try provider.listSessionFiles()
+        XCTAssertEqual(files.count, 1)
+        XCTAssertEqual(files.first?.lastPathComponent, "abc-123.jsonl")
     }
 
-    func testListSessionsRespectsLimit() throws {
+    func testListSessionFilesReturnsAll() throws {
         let projectDir = tempDir.appendingPathComponent("-Users-test-project")
         try FileManager.default.createDirectory(at: projectDir, withIntermediateDirectories: true)
 
@@ -52,8 +51,52 @@ final class ClaudeProviderTests: XCTestCase {
         }
 
         let provider = ClaudeProvider(claudeDir: tempDir)
-        let sessions = try provider.listSessions(limit: 3)
-        XCTAssertEqual(sessions.count, 3)
+        let files = try provider.listSessionFiles()
+        XCTAssertEqual(files.count, 5)
+    }
+
+    func testListSessionFilesSortedByModDateDescending() throws {
+        let projectDir = tempDir.appendingPathComponent("-Users-test-project")
+        try FileManager.default.createDirectory(at: projectDir, withIntermediateDirectories: true)
+
+        // Create files with different modification dates
+        let older = projectDir.appendingPathComponent("older.jsonl")
+        try makeMinimalJSONL(sessionId: "old").write(to: older, atomically: true, encoding: .utf8)
+
+        // Small delay so mod dates differ
+        Thread.sleep(forTimeInterval: 0.05)
+
+        let newer = projectDir.appendingPathComponent("newer.jsonl")
+        try makeMinimalJSONL(sessionId: "new").write(to: newer, atomically: true, encoding: .utf8)
+
+        let provider = ClaudeProvider(claudeDir: tempDir)
+        let files = try provider.listSessionFiles()
+        XCTAssertEqual(files.count, 2)
+        XCTAssertEqual(files.first?.lastPathComponent, "newer.jsonl")
+    }
+
+    // MARK: - Session Scanning
+
+    func testScanSessionReturnsSummary() throws {
+        let projectDir = tempDir.appendingPathComponent("-Users-test-project")
+        try FileManager.default.createDirectory(at: projectDir, withIntermediateDirectories: true)
+
+        let file = projectDir.appendingPathComponent("abc-123.jsonl")
+        try makeMinimalJSONL().write(to: file, atomically: true, encoding: .utf8)
+
+        let provider = ClaudeProvider(claudeDir: tempDir)
+        let summary = provider.scanSession(at: file)
+        XCTAssertNotNil(summary)
+        XCTAssertEqual(summary?.id, "sess-1")
+        XCTAssertEqual(summary?.agent, .claudeCode)
+    }
+
+    func testScanSessionReturnsNilForInvalidFile() throws {
+        let file = tempDir.appendingPathComponent("bad.jsonl")
+        try "not valid json".write(to: file, atomically: true, encoding: .utf8)
+
+        let provider = ClaudeProvider(claudeDir: tempDir)
+        XCTAssertNil(provider.scanSession(at: file))
     }
 
     // MARK: - JSONL Parsing

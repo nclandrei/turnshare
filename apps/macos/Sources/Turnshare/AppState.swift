@@ -9,6 +9,12 @@ final class AppState: ObservableObject {
     @Published var sessions: [SessionSummary] = []
     @Published var isLoading = false
     @Published var searchText = ""
+    @Published var hasMoreSessions = false
+
+    /// All session file URLs sorted by mod date. Populated once, pages scanned on demand.
+    private var allSessionFiles: [URL] = []
+    private var loadedFileCount = 0
+    private static let pageSize = 50
 
     // Auth state
     @Published var isAuthenticated = false
@@ -98,11 +104,47 @@ final class AppState: ObservableObject {
         defer { isLoading = false }
 
         do {
-            sessions = try claudeProvider.listSessions()
+            allSessionFiles = try claudeProvider.listSessionFiles()
+            loadedFileCount = 0
+            sessions = []
+            loadNextPage()
         } catch {
             print("Failed to load sessions: \(error)")
             sessions = []
+            hasMoreSessions = false
         }
+    }
+
+    func loadMoreIfNeeded(currentSession: SessionSummary) {
+        guard hasMoreSessions, !isLoading else { return }
+        // Trigger when within 5 items of the end
+        let thresholdIndex = sessions.index(sessions.endIndex, offsetBy: -5, limitedBy: sessions.startIndex) ?? sessions.startIndex
+        if let currentIndex = sessions.firstIndex(where: { $0.id == currentSession.id }),
+           currentIndex >= thresholdIndex {
+            loadNextPage()
+        }
+    }
+
+    private func loadNextPage() {
+        let start = loadedFileCount
+        let end = min(start + Self.pageSize, allSessionFiles.count)
+        guard start < end else {
+            hasMoreSessions = false
+            return
+        }
+
+        let pageFiles = allSessionFiles[start..<end]
+        var newSummaries: [SessionSummary] = []
+
+        for file in pageFiles {
+            if let summary = claudeProvider.scanSession(at: file) {
+                newSummaries.append(summary)
+            }
+        }
+
+        sessions.append(contentsOf: newSummaries)
+        loadedFileCount = end
+        hasMoreSessions = end < allSessionFiles.count
     }
 
     // MARK: - Auth
