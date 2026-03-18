@@ -24,6 +24,6 @@ let package = Package(
         .testTarget(name: "SessionCoreTests", dependencies: ["SessionCore"]),
         .testTarget(name: "ProviderClaudeTests", dependencies: ["ProviderClaude", "SessionCore"]),
         .testTarget(name: "PublisherGistTests", dependencies: ["PublisherGist", "SessionCore"]),
-        .testTarget(name: "TurnshareTests", dependencies: ["SessionCore", "HotKey"]),
+        .testTarget(name: "TurnshareTests", dependencies: ["SessionCore", "ProviderClaude", "Turnshare", "HotKey"]),
     ]
 )

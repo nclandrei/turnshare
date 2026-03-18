@@ -36,9 +36,19 @@ struct SessionListView: View {
                         Array(appState.filteredSessions.enumerated()),
                         id: \.element.id
                     ) { index, session in
-                        SessionRowView(session: session, shortcutIndex: index < 9 ? index + 1 : nil)
-                            .contentShape(Rectangle())
-                            .onTapGesture { appState.publishByIndex(index) }
+                        SessionRowView(
+                            session: session,
+                            shortcutIndex: index < 9 ? index + 1 : nil
+                        )
+                        .contentShape(Rectangle())
+                        .onTapGesture { appState.publishByIndex(index) }
+                        .onHover { hovering in
+                            if hovering {
+                                appState.loadPreview(for: session.id)
+                            } else {
+                                appState.clearPreview()
+                            }
+                        }
                     }
                 }
                 .listStyle(.plain)
@@ -283,5 +293,172 @@ struct SessionRowView: View {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .abbreviated
         return formatter.localizedString(for: session.startedAt, relativeTo: Date())
+    }
+}
+
+// MARK: - Preview Panel (side panel shown on hover)
+
+struct PreviewPanelView: View {
+    @EnvironmentObject var appState: AppState
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if let session = currentSession {
+                // Header
+                PreviewHeaderView(session: session)
+                Divider()
+
+                // Conversation body
+                if appState.isLoadingPreview {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                        Spacer()
+                    }
+                    Spacer()
+                } else if appState.previewTurns.isEmpty {
+                    Spacer()
+                    Text("No conversation data")
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity)
+                    Spacer()
+                } else {
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 12) {
+                            ForEach(appState.previewTurns) { turn in
+                                PreviewTurnView(turn: turn)
+                            }
+                        }
+                        .padding(12)
+                    }
+                }
+            }
+        }
+    }
+
+    private var currentSession: SessionSummary? {
+        guard let id = appState.previewSessionId else { return nil }
+        return appState.sessions.first { $0.id == id }
+    }
+}
+
+private struct PreviewHeaderView: View {
+    let session: SessionSummary
+
+    var body: some View {
+        HStack {
+            Text(agentLabel)
+                .font(.caption2)
+                .fontWeight(.medium)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(agentColor.opacity(0.15))
+                .foregroundColor(agentColor)
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+
+            if let project = session.projectName {
+                Text(project)
+                    .font(.headline)
+                    .lineLimit(1)
+            }
+
+            if let branch = session.gitBranch {
+                Text(branch)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            Text(timeAgo)
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .padding(10)
+    }
+
+    private var agentLabel: String {
+        switch session.agent {
+        case .claudeCode: return "Claude"
+        case .codex: return "Codex"
+        case .opencode: return "OpenCode"
+        }
+    }
+
+    private var agentColor: Color {
+        switch session.agent {
+        case .claudeCode: return .orange
+        case .codex: return .green
+        case .opencode: return .blue
+        }
+    }
+
+    private var timeAgo: String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: session.startedAt, relativeTo: Date())
+    }
+}
+
+struct PreviewTurnView: View {
+    let turn: Turn
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(roleLabel)
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundColor(roleColor)
+
+            if turn.role == .tool {
+                // Tool turns: just show tool name, dimmed
+                Text(turnText)
+                    .font(.callout)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+            } else {
+                Text(turnText)
+                    .font(.body)
+                    .foregroundColor(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private var roleLabel: String {
+        switch turn.role {
+        case .user: return "User"
+        case .assistant: return "Assistant"
+        case .tool: return "Tool"
+        }
+    }
+
+    private var roleColor: Color {
+        switch turn.role {
+        case .user: return .blue
+        case .assistant: return .orange
+        case .tool: return .gray
+        }
+    }
+
+    private var turnText: String {
+        Self.extractText(from: turn)
+    }
+
+    /// Extract a human-readable summary from a turn's content blocks.
+    static func extractText(from turn: Turn) -> String {
+        let texts = turn.content.compactMap { block -> String? in
+            switch block {
+            case .text(let text):
+                return text
+            case .toolUse(let toolUse):
+                return "[\(toolUse.name)]"
+            case .toolResult(let result):
+                return result.output.isEmpty ? nil : String(result.output.prefix(100))
+            }
+        }
+        return texts.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
