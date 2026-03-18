@@ -22,8 +22,17 @@ final class AppState: ObservableObject {
     @Published var lastPublishedURL: String?
     @Published var publishError: String?
 
+    // Preview state
+    @Published var previewSessionId: String?
+    @Published var previewTurns: [Turn] = []
+    @Published var isLoadingPreview = false
+    private var previewCache: [String: [Turn]] = [:]
+
     /// Called after a publish is initiated (panel should close).
     var onPublishInitiated: (() -> Void)?
+
+    /// Called when the hovered preview session changes (nil = hide preview panel).
+    var onPreviewChanged: ((String?) -> Void)?
 
     private let claudeProvider = ClaudeProvider()
     private let auth: GitHubAuth
@@ -114,6 +123,45 @@ final class AppState: ObservableObject {
             self.isAuthenticated = false
             self.githubUsername = nil
         }
+    }
+
+    // MARK: - Preview
+
+    /// Maximum number of turns to show in the hover preview.
+    nonisolated static let previewTurnLimit = 20
+
+    func loadPreview(for sessionId: String) {
+        guard previewSessionId != sessionId else { return }
+        previewSessionId = sessionId
+
+        if let cached = previewCache[sessionId] {
+            previewTurns = cached
+            onPreviewChanged?(sessionId)
+            return
+        }
+
+        guard let summary = sessions.first(where: { $0.id == sessionId }) else { return }
+        isLoadingPreview = true
+
+        do {
+            let session = try claudeProvider.parseSession(at: summary.filePath)
+            // Filter out tool-result turns (noisy) and take first N user+assistant turns
+            let filtered = session.turns.filter { $0.role != .tool }
+            let limited = Array(filtered.prefix(Self.previewTurnLimit))
+            previewCache[sessionId] = limited
+            previewTurns = limited
+        } catch {
+            previewTurns = []
+        }
+        isLoadingPreview = false
+        onPreviewChanged?(sessionId)
+    }
+
+    func clearPreview() {
+        previewSessionId = nil
+        previewTurns = []
+        isLoadingPreview = false
+        onPreviewChanged?(nil)
     }
 
     // MARK: - Publish

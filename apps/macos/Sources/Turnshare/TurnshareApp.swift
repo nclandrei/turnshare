@@ -16,6 +16,7 @@ struct TurnshareApp: App {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var panel: FloatingPanel!
+    private var previewPanel: NSPanel!
     private var hotKey: HotKey?
     private let appState = AppState()
     private let hotKeyConfig = HotKeyConfig.shared
@@ -47,9 +48,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.appState.publishByIndex(index)
         }
 
+        // Create preview panel (side panel for hover preview)
+        previewPanel = Self.makePreviewPanel(appState: appState)
+
         // Close panel when a publish is initiated
         appState.onPublishInitiated = { [weak self] in
             self?.hidePanel()
+        }
+
+        // Show/hide preview panel when hovering sessions
+        appState.onPreviewChanged = { [weak self] sessionId in
+            guard let self else { return }
+            if sessionId != nil {
+                self.showPreviewPanel()
+            } else {
+                self.previewPanel.orderOut(nil)
+            }
         }
 
         // Register global hotkey
@@ -103,10 +117,78 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func hidePanel() {
         panel.orderOut(nil)
+        previewPanel.orderOut(nil)
         if let monitor = clickOutsideMonitor {
             NSEvent.removeMonitor(monitor)
             clickOutsideMonitor = nil
         }
+    }
+
+    private func showPreviewPanel() {
+        guard panel.isVisible else { return }
+
+        let mainFrame = panel.frame
+        let previewSize = previewPanel.frame.size
+
+        // Try positioning to the right of the main panel
+        let screen = panel.screen ?? NSScreen.main ?? NSScreen.screens.first!
+        let screenFrame = screen.visibleFrame
+
+        let rightX = mainFrame.maxX + 4
+        let leftX = mainFrame.minX - previewSize.width - 4
+
+        let x: CGFloat
+        if rightX + previewSize.width <= screenFrame.maxX {
+            x = rightX
+        } else {
+            x = leftX
+        }
+
+        // Align top edges
+        let y = mainFrame.maxY - previewSize.height
+
+        previewPanel.setFrameOrigin(NSPoint(x: x, y: y))
+        previewPanel.orderFront(nil)
+    }
+
+    private static func makePreviewPanel(appState: AppState) -> NSPanel {
+        let panel = NSPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 450, height: 500),
+            styleMask: [.nonactivatingPanel, .borderless],
+            backing: .buffered,
+            defer: false
+        )
+        panel.isFloatingPanel = true
+        panel.level = .floating
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = true
+
+        let hostingView = NSHostingView(
+            rootView: PreviewPanelView().environmentObject(appState)
+        )
+        hostingView.wantsLayer = true
+        hostingView.layer?.cornerRadius = 12
+        hostingView.layer?.masksToBounds = true
+
+        let visualEffect = NSVisualEffectView()
+        visualEffect.material = .popover
+        visualEffect.state = .active
+        visualEffect.wantsLayer = true
+        visualEffect.layer?.cornerRadius = 12
+        visualEffect.layer?.masksToBounds = true
+        visualEffect.addSubview(hostingView)
+
+        hostingView.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            hostingView.topAnchor.constraint(equalTo: visualEffect.topAnchor),
+            hostingView.bottomAnchor.constraint(equalTo: visualEffect.bottomAnchor),
+            hostingView.leadingAnchor.constraint(equalTo: visualEffect.leadingAnchor),
+            hostingView.trailingAnchor.constraint(equalTo: visualEffect.trailingAnchor),
+        ])
+
+        panel.contentView = visualEffect
+        return panel
     }
 }
 
