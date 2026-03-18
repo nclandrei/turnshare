@@ -20,6 +20,10 @@ final class AppState: ObservableObject {
     // Quick-publish modifier symbol (reactive, drives shortcut hints in rows)
     @Published var quickPublishSymbol: String = QuickPublishConfig.shared.modifier.symbol
 
+    // Publish confirmation mode
+    @Published var requirePublishConfirmation: Bool = PublishConfirmConfig.shared.isEnabled
+    @Published var selectedSessionIndex: Int?
+
     // Publish state
     @Published var isPublishing = false
     @Published var lastPublishedURL: String?
@@ -205,14 +209,54 @@ final class AppState: ObservableObject {
     // MARK: - Publish
 
     /// Publish the session at the given index in `filteredSessions`.
-    /// Returns `true` if the publish was initiated (panel should close).
+    /// In confirmation mode, selects the session instead of publishing immediately.
+    /// Returns `true` if the action was performed (publish or select).
     @discardableResult
     func publishByIndex(_ index: Int) -> Bool {
+        if requirePublishConfirmation {
+            return selectByIndex(index)
+        }
         let list = filteredSessions
         guard index >= 0, index < list.count else { return false }
         guard isAuthenticated, !isPublishing else { return false }
         publish(sessionId: list[index].id)
         return true
+    }
+
+    /// Select a session for confirmation (two-step publish).
+    @discardableResult
+    func selectByIndex(_ index: Int) -> Bool {
+        let list = filteredSessions
+        guard index >= 0, index < list.count else { return false }
+        selectedSessionIndex = index
+        return true
+    }
+
+    /// Publish the currently selected session (confirmation step).
+    @discardableResult
+    func confirmPublish() -> Bool {
+        guard let index = selectedSessionIndex else { return false }
+        let list = filteredSessions
+        guard index >= 0, index < list.count else {
+            selectedSessionIndex = nil
+            return false
+        }
+        guard isAuthenticated, !isPublishing else { return false }
+        let sessionId = list[index].id
+        selectedSessionIndex = nil
+        publish(sessionId: sessionId)
+        return true
+    }
+
+    /// Clear the current selection without publishing.
+    func cancelSelection() {
+        selectedSessionIndex = nil
+    }
+
+    /// Called from settings when the publish confirmation toggle changes.
+    func publishConfirmationChanged() {
+        requirePublishConfirmation = PublishConfirmConfig.shared.isEnabled
+        selectedSessionIndex = nil
     }
 
     func publish(sessionId: String) {

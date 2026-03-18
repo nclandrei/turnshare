@@ -51,6 +51,33 @@ struct SettingsView: View {
 
             Divider()
 
+            // Publish Behavior
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Publish Behavior")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+
+                Toggle(isOn: Binding(
+                    get: { PublishConfirmConfig.shared.isEnabled },
+                    set: { newValue in
+                        PublishConfirmConfig.shared.update(newValue)
+                        appState.publishConfirmationChanged()
+                    }
+                )) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Confirm before publishing")
+                            .font(.subheadline)
+                        Text("Select a session first, then confirm with a Publish button")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .toggleStyle(.switch)
+                .controlSize(.small)
+            }
+
+            Divider()
+
             // GitHub Account
             VStack(alignment: .leading, spacing: 6) {
                 Text("GitHub")

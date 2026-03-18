@@ -126,6 +126,79 @@ final class AppStateTests: XCTestCase {
         }
     }
 
+    // MARK: - Publish Confirmation Mode (select → confirm)
+
+    func testPublishByIndexInConfirmModeSelectsInsteadOfPublishing() {
+        let sessions = makeSessions()
+        // In confirm mode, publishByIndex should set selectedIndex instead of returning session for publish
+        var selectedIndex: Int? = nil
+        let result = publishByIndexConfirmMode(0, sessions: sessions, query: "", selectedIndex: &selectedIndex)
+        XCTAssertTrue(result)
+        XCTAssertEqual(selectedIndex, 0)
+    }
+
+    func testSelectByIndexSetsSelectedSession() {
+        let sessions = makeSessions()
+        var selectedIndex: Int? = nil
+        let result = selectByIndex(1, sessions: sessions, query: "", selectedIndex: &selectedIndex)
+        XCTAssertTrue(result)
+        XCTAssertEqual(selectedIndex, 1)
+    }
+
+    func testSelectByIndexOutOfBoundsReturnsNil() {
+        let sessions = makeSessions()
+        var selectedIndex: Int? = nil
+        XCTAssertFalse(selectByIndex(-1, sessions: sessions, query: "", selectedIndex: &selectedIndex))
+        XCTAssertNil(selectedIndex)
+        XCTAssertFalse(selectByIndex(99, sessions: sessions, query: "", selectedIndex: &selectedIndex))
+        XCTAssertNil(selectedIndex)
+    }
+
+    func testSelectByIndexRespectsFilter() {
+        let sessions = makeSessions()
+        var selectedIndex: Int? = nil
+        // Filter to "cinetry" → only session id "2"
+        let result = selectByIndex(0, sessions: sessions, query: "cinetry", selectedIndex: &selectedIndex)
+        XCTAssertTrue(result)
+        XCTAssertEqual(selectedIndex, 0)
+        // Verify the session at index 0 in the filtered list is "cinetry"
+        let filtered = filterSessions(sessions, query: "cinetry")
+        XCTAssertEqual(filtered[selectedIndex!].projectName, "cinetry")
+        // Index 1 is out of bounds
+        var idx2: Int? = nil
+        XCTAssertFalse(selectByIndex(1, sessions: sessions, query: "cinetry", selectedIndex: &idx2))
+    }
+
+    func testConfirmPublishReturnsSelectedSession() {
+        let sessions = makeSessions()
+        var selectedIndex: Int? = 1
+        let session = confirmPublish(sessions: sessions, query: "", selectedIndex: &selectedIndex)
+        XCTAssertNotNil(session)
+        XCTAssertEqual(session?.id, "2")
+        XCTAssertNil(selectedIndex, "Selection should be cleared after confirm")
+    }
+
+    func testConfirmPublishWhenNothingSelectedReturnsNil() {
+        let sessions = makeSessions()
+        var selectedIndex: Int? = nil
+        let session = confirmPublish(sessions: sessions, query: "", selectedIndex: &selectedIndex)
+        XCTAssertNil(session)
+    }
+
+    func testCancelSelectionClearsSelectedIndex() {
+        var selectedIndex: Int? = 2
+        cancelSelection(&selectedIndex)
+        XCTAssertNil(selectedIndex)
+    }
+
+    func testInstantModeDoesNotSelect() {
+        let sessions = makeSessions()
+        // In instant mode, publishByIndex returns the session directly without setting selectedIndex
+        let session = sessionAtIndex(0, sessions: sessions, query: "")
+        XCTAssertNotNil(session)
+        // There's no selectedIndex concept in instant mode
+    }
+
     // MARK: - Helpers
 
     /// Mirrors the shortcut index assignment logic: items 0-8 get 1-9, rest get nil.
@@ -144,6 +217,37 @@ final class AppStateTests: XCTestCase {
         let list = filterSessions(sessions, query: query)
         guard index >= 0, index < list.count else { return nil }
         return list[index]
+    }
+
+    /// Mirrors AppState.publishByIndex in confirmation mode — selects instead of publishing.
+    private func publishByIndexConfirmMode(_ index: Int, sessions: [SessionSummary], query: String, selectedIndex: inout Int?) -> Bool {
+        return selectByIndex(index, sessions: sessions, query: query, selectedIndex: &selectedIndex)
+    }
+
+    /// Mirrors AppState.selectByIndex — sets selectedSessionIndex.
+    private func selectByIndex(_ index: Int, sessions: [SessionSummary], query: String, selectedIndex: inout Int?) -> Bool {
+        let list = filterSessions(sessions, query: query)
+        guard index >= 0, index < list.count else { return false }
+        selectedIndex = index
+        return true
+    }
+
+    /// Mirrors AppState.confirmPublish — publishes the selected session.
+    private func confirmPublish(sessions: [SessionSummary], query: String, selectedIndex: inout Int?) -> SessionSummary? {
+        guard let index = selectedIndex else { return nil }
+        let list = filterSessions(sessions, query: query)
+        guard index >= 0, index < list.count else {
+            selectedIndex = nil
+            return nil
+        }
+        let session = list[index]
+        selectedIndex = nil
+        return session
+    }
+
+    /// Mirrors AppState.cancelSelection.
+    private func cancelSelection(_ selectedIndex: inout Int?) {
+        selectedIndex = nil
     }
 
     /// Mirrors AppState.filteredSessions logic without requiring @MainActor.

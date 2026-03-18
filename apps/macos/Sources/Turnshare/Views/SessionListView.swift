@@ -38,7 +38,8 @@ struct SessionListView: View {
                     ) { index, session in
                         SessionRowView(
                             session: session,
-                            shortcutIndex: index < 9 ? index + 1 : nil
+                            shortcutIndex: index < 9 ? index + 1 : nil,
+                            isSelected: appState.selectedSessionIndex == index
                         )
                         .contentShape(Rectangle())
                         .onTapGesture { appState.publishByIndex(index) }
@@ -52,6 +53,13 @@ struct SessionListView: View {
                     }
                 }
                 .listStyle(.plain)
+            }
+
+            // Confirmation bar
+            if let selectedIndex = appState.selectedSessionIndex,
+               selectedIndex < appState.filteredSessions.count {
+                Divider()
+                ConfirmationBarView(session: appState.filteredSessions[selectedIndex])
             }
 
             Divider()
@@ -171,6 +179,7 @@ struct SessionRowView: View {
     let session: SessionSummary
     /// 1-based shortcut number (nil for items beyond 9).
     let shortcutIndex: Int?
+    var isSelected: Bool = false
 
     var body: some View {
         HStack(spacing: 8) {
@@ -226,6 +235,19 @@ struct SessionRowView: View {
             }
         }
         .padding(.vertical, 4)
+        .padding(.horizontal, isSelected ? 4 : 0)
+        .background(
+            isSelected
+                ? RoundedRectangle(cornerRadius: 6)
+                    .fill(Color.accentColor.opacity(0.12))
+                : nil
+        )
+        .overlay(
+            isSelected
+                ? RoundedRectangle(cornerRadius: 6)
+                    .strokeBorder(Color.accentColor.opacity(0.5), lineWidth: 1.5)
+                : nil
+        )
     }
 
     private var agentLabel: String {
@@ -456,5 +478,49 @@ private struct ToolUsePill: View {
             .replacingOccurrences(of: "\n", with: " ")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         return String(clean.prefix(60))
+    }
+}
+
+// MARK: - Confirmation Bar
+
+struct ConfirmationBarView: View {
+    @EnvironmentObject var appState: AppState
+    let session: SessionSummary
+
+    var body: some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                if let project = session.projectName {
+                    Text(project)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .lineLimit(1)
+                }
+                if let message = session.firstUserMessage {
+                    Text(message)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer()
+
+            Button("Cancel") {
+                appState.cancelSelection()
+            }
+            .buttonStyle(.plain)
+            .font(.subheadline)
+            .foregroundColor(.secondary)
+
+            Button("Publish") {
+                appState.confirmPublish()
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(.ultraThinMaterial)
     }
 }

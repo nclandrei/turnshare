@@ -55,6 +55,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.appState.publishByIndex(index)
         }
 
+        // Wire Enter key → confirm publish
+        panel.onConfirmPublish = { [weak self] in
+            self?.appState.confirmPublish()
+        }
+
+        // Wire Escape key → cancel selection (if selected), else close handled by default
+        panel.onCancelSelection = { [weak self] in
+            guard let self else { return }
+            if self.appState.selectedSessionIndex != nil {
+                self.appState.cancelSelection()
+            } else {
+                self.hidePanel()
+            }
+        }
+
         // Create preview panel (side panel for hover preview)
         previewPanel = Self.makePreviewPanel(appState: appState)
 
@@ -216,6 +231,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 final class FloatingPanel: NSPanel {
     /// Called with the 0-based index when the user presses Cmd+1…9.
     var onPublishIndex: ((Int) -> Void)?
+    /// Called when Enter is pressed (confirm publish in two-step mode).
+    var onConfirmPublish: (() -> Void)?
+    /// Called when Escape is pressed while a session is selected (cancel selection).
+    var onCancelSelection: (() -> Void)?
 
     init<Content: View>(rootView: Content) {
         super.init(
@@ -272,11 +291,24 @@ final class FloatingPanel: NSPanel {
             onPublishIndex?(num - 1)
             return true
         }
+
+        // Enter/Return → confirm publish
+        if event.keyCode == 36 || event.keyCode == 76 {
+            if let handler = onConfirmPublish {
+                handler()
+                return true
+            }
+        }
+
         return super.performKeyEquivalent(with: event)
     }
 
-    // Close on Escape
+    // Escape: cancel selection first, then close panel
     override func cancelOperation(_ sender: Any?) {
-        orderOut(nil)
+        if let handler = onCancelSelection {
+            handler()
+        } else {
+            orderOut(nil)
+        }
     }
 }

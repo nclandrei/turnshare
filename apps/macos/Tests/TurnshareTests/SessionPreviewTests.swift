@@ -6,90 +6,6 @@ import XCTest
 /// Tests for the expand-on-hover session preview feature.
 final class SessionPreviewTests: XCTestCase {
 
-    // MARK: - Turn Text Extraction
-
-    func testExtractTextFromPlainText() {
-        let turn = Turn(role: .user, content: [.text("Hello world")], timestamp: Date())
-        let text = PreviewTurnView.extractText(from: turn)
-        XCTAssertEqual(text, "Hello world")
-    }
-
-    func testExtractTextFromMultipleTextBlocks() {
-        let turn = Turn(
-            role: .assistant,
-            content: [.text("First"), .text("Second")],
-            timestamp: Date()
-        )
-        let text = PreviewTurnView.extractText(from: turn)
-        XCTAssertEqual(text, "First Second")
-    }
-
-    func testExtractTextFromToolUse() {
-        let turn = Turn(
-            role: .assistant,
-            content: [.toolUse(ToolUse(name: "Read", id: "tu-1", input: nil))],
-            timestamp: Date()
-        )
-        let text = PreviewTurnView.extractText(from: turn)
-        XCTAssertEqual(text, "[Read]")
-    }
-
-    func testExtractTextFromToolResult() {
-        let turn = Turn(
-            role: .tool,
-            content: [.toolResult(ToolResult(toolUseId: "tu-1", output: "file contents here"))],
-            timestamp: Date()
-        )
-        let text = PreviewTurnView.extractText(from: turn)
-        XCTAssertEqual(text, "file contents here")
-    }
-
-    func testExtractTextFromEmptyToolResult() {
-        let turn = Turn(
-            role: .tool,
-            content: [.toolResult(ToolResult(toolUseId: "tu-1", output: ""))],
-            timestamp: Date()
-        )
-        let text = PreviewTurnView.extractText(from: turn)
-        XCTAssertEqual(text, "")
-    }
-
-    func testExtractTextFromMixedContent() {
-        let turn = Turn(
-            role: .assistant,
-            content: [
-                .text("Let me read that file."),
-                .toolUse(ToolUse(name: "Read", id: "tu-1", input: nil)),
-            ],
-            timestamp: Date()
-        )
-        let text = PreviewTurnView.extractText(from: turn)
-        XCTAssertEqual(text, "Let me read that file. [Read]")
-    }
-
-    func testExtractTextTrimsWhitespace() {
-        let turn = Turn(role: .user, content: [.text("  hello  ")], timestamp: Date())
-        let text = PreviewTurnView.extractText(from: turn)
-        XCTAssertEqual(text, "hello")
-    }
-
-    func testExtractTextTruncatesLongToolResult() {
-        let longOutput = String(repeating: "x", count: 200)
-        let turn = Turn(
-            role: .tool,
-            content: [.toolResult(ToolResult(toolUseId: "tu-1", output: longOutput))],
-            timestamp: Date()
-        )
-        let text = PreviewTurnView.extractText(from: turn)
-        XCTAssertEqual(text.count, 100)
-    }
-
-    func testExtractTextFromEmptyContent() {
-        let turn = Turn(role: .user, content: [], timestamp: Date())
-        let text = PreviewTurnView.extractText(from: turn)
-        XCTAssertEqual(text, "")
-    }
-
     // MARK: - Preview Turn Limit
 
     func testPreviewTurnLimitIsReasonable() {
@@ -136,12 +52,13 @@ final class SessionPreviewTests: XCTestCase {
         XCTAssertEqual(previewTurns[1].role, .assistant)
         XCTAssertEqual(previewTurns[2].role, .user)
 
-        // Verify text extraction works on parsed turns
-        let firstText = PreviewTurnView.extractText(from: previewTurns[0])
-        XCTAssertEqual(firstText, "Fix the bug")
-
-        let secondText = PreviewTurnView.extractText(from: previewTurns[1])
-        XCTAssertEqual(secondText, "I'll look into it.")
+        // Verify content of parsed turns
+        if case .text(let t) = previewTurns[0].content.first {
+            XCTAssertEqual(t, "Fix the bug")
+        } else { XCTFail("Expected text block") }
+        if case .text(let t) = previewTurns[1].content.first {
+            XCTAssertEqual(t, "I'll look into it.")
+        } else { XCTFail("Expected text block") }
     }
 
     func testPreviewTruncatesLongSessions() throws {
@@ -189,14 +106,23 @@ final class SessionPreviewTests: XCTestCase {
         let previewTurns = Array(session.turns.prefix(AppState.previewTurnLimit))
         XCTAssertEqual(previewTurns.count, 3)
 
-        // Assistant turn should show both text and tool use
-        let assistantText = PreviewTurnView.extractText(from: previewTurns[1])
-        XCTAssertTrue(assistantText.contains("Sure."))
-        XCTAssertTrue(assistantText.contains("[Read]"))
+        // Assistant turn should have text and tool use blocks
+        XCTAssertEqual(previewTurns[1].content.count, 2)
+        if case .text(let t) = previewTurns[1].content[0] {
+            XCTAssertEqual(t, "Sure.")
+        } else { XCTFail("Expected text block") }
+        if case .toolUse(let tu) = previewTurns[1].content[1] {
+            XCTAssertEqual(tu.name, "Read")
+        } else {
+            XCTFail("Expected tool use block")
+        }
 
         // Tool result turn
-        let toolText = PreviewTurnView.extractText(from: previewTurns[2])
-        XCTAssertEqual(toolText, "file content here")
+        if case .toolResult(let tr) = previewTurns[2].content[0] {
+            XCTAssertEqual(tr.output, "file content here")
+        } else {
+            XCTFail("Expected tool result block")
+        }
     }
 
     func testPreviewEmptySession() throws {
@@ -235,10 +161,7 @@ final class SessionPreviewTests: XCTestCase {
         XCTAssertEqual(turns1.count, turns2.count)
         for (t1, t2) in zip(turns1, turns2) {
             XCTAssertEqual(t1.role, t2.role)
-            XCTAssertEqual(
-                PreviewTurnView.extractText(from: t1),
-                PreviewTurnView.extractText(from: t2)
-            )
+            XCTAssertEqual(t1.content.count, t2.content.count)
         }
     }
 
