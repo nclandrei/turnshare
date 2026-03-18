@@ -29,7 +29,10 @@ final class AppState: ObservableObject {
     @Published var previewSessionId: String?
     @Published var previewTurns: [Turn] = []
     @Published var isLoadingPreview = false
+    /// True while the mouse is inside the preview panel itself.
+    var isHoveringPreviewPanel = false
     private var previewCache: [String: [Turn]] = [:]
+    private var clearPreviewTask: Task<Void, Never>?
 
     /// Called after a publish is initiated (panel should close).
     var onPublishInitiated: (() -> Void)?
@@ -137,6 +140,10 @@ final class AppState: ObservableObject {
     nonisolated static let previewTurnLimit = 20
 
     func loadPreview(for sessionId: String) {
+        // Cancel any pending clear — user moved to another row
+        clearPreviewTask?.cancel()
+        clearPreviewTask = nil
+
         guard previewSessionId != sessionId else { return }
         previewSessionId = sessionId
 
@@ -163,7 +170,25 @@ final class AppState: ObservableObject {
         onPreviewChanged?(sessionId)
     }
 
+    /// Schedule a delayed clear so the user can move to the preview panel.
     func clearPreview() {
+        clearPreviewTask?.cancel()
+        clearPreviewTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 200_000_000) // 200ms grace period
+            guard !Task.isCancelled else { return }
+            guard !isHoveringPreviewPanel else { return }
+            previewSessionId = nil
+            previewTurns = []
+            isLoadingPreview = false
+            onPreviewChanged?(nil)
+        }
+    }
+
+    /// Immediately dismiss the preview (e.g. when hiding the main panel).
+    func clearPreviewImmediately() {
+        clearPreviewTask?.cancel()
+        clearPreviewTask = nil
+        isHoveringPreviewPanel = false
         previewSessionId = nil
         previewTurns = []
         isLoadingPreview = false

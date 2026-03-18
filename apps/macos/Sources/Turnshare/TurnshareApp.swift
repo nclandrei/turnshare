@@ -121,9 +121,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.setFrameOrigin(NSPoint(x: x, y: y))
         panel.makeKeyAndOrderFront(nil)
 
-        // Monitor for clicks outside the panel to dismiss
+        // Monitor for clicks outside both panels to dismiss
         clickOutsideMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
             guard let self, self.panel.isVisible else { return }
+            let clickLocation = NSEvent.mouseLocation
+            // Don't dismiss if clicking inside the main panel or preview panel
+            if NSMouseInRect(clickLocation, self.panel.frame, false) { return }
+            if self.previewPanel.isVisible,
+               NSMouseInRect(clickLocation, self.previewPanel.frame, false) { return }
             self.hidePanel()
         }
     }
@@ -131,6 +136,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func hidePanel() {
         panel.orderOut(nil)
         previewPanel.orderOut(nil)
+        appState.clearPreviewImmediately()
         if let monitor = clickOutsideMonitor {
             NSEvent.removeMonitor(monitor)
             clickOutsideMonitor = nil

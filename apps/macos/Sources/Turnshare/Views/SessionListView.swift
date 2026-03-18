@@ -293,6 +293,12 @@ struct PreviewPanelView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onHover { hovering in
+            appState.isHoveringPreviewPanel = hovering
+            if !hovering {
+                appState.clearPreview()
+            }
+        }
     }
 
     private var currentSession: SessionSummary? {
