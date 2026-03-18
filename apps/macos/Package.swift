@@ -13,16 +13,18 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "Turnshare",
-            dependencies: ["SessionCore", "ProviderClaude", "PublisherGist", "HotKey"],
+            dependencies: ["SessionCore", "ProviderClaude", "ProviderCodex", "PublisherGist", "HotKey"],
             resources: [.process("Resources")]
         ),
         .target(name: "SessionCore"),
         .target(name: "ProviderClaude", dependencies: ["SessionCore"]),
+        .target(name: "ProviderCodex", dependencies: ["SessionCore"]),
         .target(name: "PublisherGist", dependencies: ["SessionCore"]),
 
         // Tests
         .testTarget(name: "SessionCoreTests", dependencies: ["SessionCore"]),
         .testTarget(name: "ProviderClaudeTests", dependencies: ["ProviderClaude", "SessionCore"]),
+        .testTarget(name: "ProviderCodexTests", dependencies: ["ProviderCodex", "SessionCore"]),
         .testTarget(name: "PublisherGistTests", dependencies: ["PublisherGist", "SessionCore"]),
         .testTarget(name: "TurnshareTests", dependencies: ["SessionCore", "ProviderClaude", "Turnshare", "HotKey"]),
     ]

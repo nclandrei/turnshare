@@ -2,6 +2,7 @@ import Foundation
 import AppKit
 import SessionCore
 import ProviderClaude
+import ProviderCodex
 import PublisherGist
 
 @MainActor
@@ -57,6 +58,7 @@ final class AppState: ObservableObject {
     var onQuickPublishModifierChanged: (() -> Void)?
 
     private let claudeProvider = ClaudeProvider()
+    private let codexProvider = CodexProvider()
     private let auth: GitHubAuth
     private let publisher: GistPublisher
 
@@ -75,6 +77,25 @@ final class AppState: ObservableObject {
         var cache = UserDefaults.standard.dictionary(forKey: Self.publishCacheKey) as? [String: String] ?? [:]
         cache[sessionId] = gistId
         UserDefaults.standard.set(cache, forKey: Self.publishCacheKey)
+    }
+
+    // MARK: - Provider Routing
+
+    /// Try each provider in turn; return the first successful scan.
+    private func scanSession(at file: URL) -> SessionSummary? {
+        if let summary = claudeProvider.scanSession(at: file) { return summary }
+        if let summary = codexProvider.scanSession(at: file) { return summary }
+        return nil
+    }
+
+    /// Parse using the provider that matches the session's agent.
+    private func parseSession(for summary: SessionSummary) throws -> Session {
+        switch summary.agent {
+        case .codex:
+            return try codexProvider.parseSession(at: summary.filePath)
+        case .claudeCode, .opencode:
+            return try claudeProvider.parseSession(at: summary.filePath)
+        }
     }
 
     static let githubClientId = "Ov23liMEqPKk3wK68g1w"
@@ -104,7 +125,16 @@ final class AppState: ObservableObject {
         defer { isLoading = false }
 
         do {
-            allSessionFiles = try claudeProvider.listSessionFiles()
+            var allFiles: [(url: URL, modDate: Date)] = []
+            for file in try claudeProvider.listSessionFiles() {
+                let modDate = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast
+                allFiles.append((file, modDate))
+            }
+            for file in try codexProvider.listSessionFiles() {
+                let modDate = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast
+                allFiles.append((file, modDate))
+            }
+            allSessionFiles = allFiles.sorted { $0.modDate > $1.modDate }.map(\.url)
             loadedFileCount = 0
             sessions = []
             loadNextPage()
@@ -137,7 +167,7 @@ final class AppState: ObservableObject {
         var newSummaries: [SessionSummary] = []
 
         for file in pageFiles {
-            if let summary = claudeProvider.scanSession(at: file) {
+            if let summary = scanSession(at: file) {
                 newSummaries.append(summary)
             }
         }
@@ -223,7 +253,7 @@ final class AppState: ObservableObject {
         isLoadingPreview = true
 
         do {
-            let session = try claudeProvider.parseSession(at: summary.filePath)
+            let session = try parseSession(for: summary)
             // Filter out tool-result turns (noisy) and take first N user+assistant turns
             let filtered = session.turns.filter { $0.role != .tool }
             let limited = Array(filtered.prefix(Self.previewTurnLimit))
@@ -345,7 +375,7 @@ final class AppState: ObservableObject {
 
         Task {
             do {
-                let session = try claudeProvider.parseSession(at: summary.filePath)
+                let session = try self.parseSession(for: summary)
                 let gistId = try await publisher.publish(session: session)
                 let url = "\(Self.rendererBaseURL)#\(gistId)"
 
