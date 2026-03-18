@@ -5,6 +5,7 @@ import Carbon
 struct HotKeyRecorderView: View {
     @State private var isRecording = false
     @State private var displayText: String
+    @State private var monitor: Any?
 
     var onRecord: (KeyCombo) -> Void
 
@@ -14,49 +15,90 @@ struct HotKeyRecorderView: View {
     }
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 8) {
             Text("Hotkey")
-                .font(.caption)
+                .font(.subheadline)
                 .foregroundColor(.secondary)
 
-            Button(action: { isRecording.toggle() }) {
-                Text(isRecording ? "Press shortcut..." : displayText)
-                    .font(.system(.caption, design: .monospaced))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
+            Button(action: { toggleRecording() }) {
+                Text(isRecording ? "Press shortcut…" : displayText)
+                    .font(.system(.body, design: .monospaced))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .frame(minWidth: 120)
                     .background(isRecording ? Color.accentColor.opacity(0.15) : Color.secondary.opacity(0.1))
-                    .cornerRadius(5)
+                    .cornerRadius(6)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 5)
-                            .stroke(isRecording ? Color.accentColor : Color.clear, lineWidth: 1)
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(isRecording ? Color.accentColor : Color.clear, lineWidth: 1.5)
                     )
             }
             .buttonStyle(.plain)
-            .onKeyPress { keyPress in
-                guard isRecording else { return .ignored }
-                guard let combo = keyCombo(from: keyPress) else { return .ignored }
+        }
+        .onDisappear { stopRecording() }
+    }
 
-                displayText = Self.symbolString(for: combo)
-                isRecording = false
-                onRecord(combo)
-                return .handled
-            }
+    private func toggleRecording() {
+        if isRecording {
+            stopRecording()
+        } else {
+            startRecording()
         }
     }
 
-    private func keyCombo(from keyPress: KeyPress) -> KeyCombo? {
-        let modifiers = keyPress.modifiers
-        // Require at least one modifier
-        guard !modifiers.isEmpty else { return nil }
+    private func finishWith(_ combo: KeyCombo) {
+        displayText = Self.symbolString(for: combo)
+        stopRecording()
+        onRecord(combo)
+    }
 
-        var nsModifiers: NSEvent.ModifierFlags = []
-        if modifiers.contains(.command) { nsModifiers.insert(.command) }
-        if modifiers.contains(.option) { nsModifiers.insert(.option) }
-        if modifiers.contains(.control) { nsModifiers.insert(.control) }
-        if modifiers.contains(.shift) { nsModifiers.insert(.shift) }
+    private func startRecording() {
+        isRecording = true
 
-        guard let key = Key(string: String(keyPress.characters).lowercased()) else { return nil }
-        return KeyCombo(key: key, modifiers: nsModifiers)
+        // Intercept the current global hotkey so Carbon doesn't toggle the panel
+        if let delegate = AppDelegate.shared {
+            delegate.hotKeyRecordHandler = { combo in
+                self.finishWith(combo)
+            }
+        }
+
+        // Intercept all other key combos via local event monitor
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+
+            // Escape cancels recording
+            if event.keyCode == 53 {
+                stopRecording()
+                return nil
+            }
+
+            // Require at least one modifier
+            guard !modifiers.isEmpty else { return nil }
+
+            var nsModifiers: NSEvent.ModifierFlags = []
+            if modifiers.contains(.command) { nsModifiers.insert(.command) }
+            if modifiers.contains(.option) { nsModifiers.insert(.option) }
+            if modifiers.contains(.control) { nsModifiers.insert(.control) }
+            if modifiers.contains(.shift) { nsModifiers.insert(.shift) }
+
+            let chars = event.charactersIgnoringModifiers?.lowercased() ?? ""
+            guard let key = Key(string: chars) else { return nil }
+
+            let combo = KeyCombo(key: key, modifiers: nsModifiers)
+            finishWith(combo)
+            return nil
+        }
+    }
+
+    private func stopRecording() {
+        isRecording = false
+        if let monitor = monitor {
+            NSEvent.removeMonitor(monitor)
+            self.monitor = nil
+        }
+        if let delegate = AppDelegate.shared {
+            delegate.hotKeyRecordHandler = nil
+        }
     }
 
     static func symbolString(for combo: KeyCombo) -> String {
