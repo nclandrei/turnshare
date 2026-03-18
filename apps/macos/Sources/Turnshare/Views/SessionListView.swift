@@ -225,9 +225,11 @@ struct SessionRowView: View {
                         .lineLimit(2)
                 }
 
-                Text("\(session.turnCount) turns")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                if session.turnCount > 0 {
+                    Text("\(session.turnCount) turns")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
             }
 
             // Shortcut hint (⌘1, ⌥1, ⌃1, …)

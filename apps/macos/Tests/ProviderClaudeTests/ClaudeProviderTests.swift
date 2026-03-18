@@ -75,6 +75,39 @@ final class ClaudeProviderTests: XCTestCase {
         XCTAssertEqual(files.first?.lastPathComponent, "newer.jsonl")
     }
 
+    func testListSessionFilesWithDatesReturnsTuples() throws {
+        let projectDir = tempDir.appendingPathComponent("-Users-test-project")
+        try FileManager.default.createDirectory(at: projectDir, withIntermediateDirectories: true)
+
+        let file = projectDir.appendingPathComponent("abc-123.jsonl")
+        try makeMinimalJSONL().write(to: file, atomically: true, encoding: .utf8)
+
+        let provider = ClaudeProvider(claudeDir: tempDir)
+        let tuples = try provider.listSessionFilesWithDates()
+        XCTAssertEqual(tuples.count, 1)
+        XCTAssertEqual(tuples.first?.url.lastPathComponent, "abc-123.jsonl")
+        XCTAssertNotEqual(tuples.first?.modDate, .distantPast)
+    }
+
+    func testListSessionFilesWithDatesSortedDescending() throws {
+        let projectDir = tempDir.appendingPathComponent("-Users-test-project")
+        try FileManager.default.createDirectory(at: projectDir, withIntermediateDirectories: true)
+
+        let older = projectDir.appendingPathComponent("older.jsonl")
+        try makeMinimalJSONL(sessionId: "old").write(to: older, atomically: true, encoding: .utf8)
+
+        Thread.sleep(forTimeInterval: 0.05)
+
+        let newer = projectDir.appendingPathComponent("newer.jsonl")
+        try makeMinimalJSONL(sessionId: "new").write(to: newer, atomically: true, encoding: .utf8)
+
+        let provider = ClaudeProvider(claudeDir: tempDir)
+        let tuples = try provider.listSessionFilesWithDates()
+        XCTAssertEqual(tuples.count, 2)
+        XCTAssertEqual(tuples[0].url.lastPathComponent, "newer.jsonl")
+        XCTAssertTrue(tuples[0].modDate >= tuples[1].modDate)
+    }
+
     // MARK: - Session Scanning
 
     func testScanSessionReturnsSummary() throws {

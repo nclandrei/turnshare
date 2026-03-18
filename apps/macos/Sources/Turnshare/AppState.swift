@@ -125,16 +125,9 @@ final class AppState: ObservableObject {
         defer { isLoading = false }
 
         do {
-            var allFiles: [(url: URL, modDate: Date)] = []
-            for file in try claudeProvider.listSessionFiles() {
-                let modDate = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast
-                allFiles.append((file, modDate))
-            }
-            for file in try codexProvider.listSessionFiles() {
-                let modDate = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast
-                allFiles.append((file, modDate))
-            }
-            allSessionFiles = allFiles.sorted { $0.modDate > $1.modDate }.map(\.url)
+            let claudeFiles = try claudeProvider.listSessionFilesWithDates()
+            let codexFiles = try codexProvider.listSessionFilesWithDates()
+            allSessionFiles = Self.mergeSortedDescending(claudeFiles, codexFiles).map(\.url)
             loadedFileCount = 0
             sessions = []
             loadNextPage()
@@ -143,6 +136,26 @@ final class AppState: ObservableObject {
             sessions = []
             hasMoreSessions = false
         }
+    }
+
+    /// Merge two arrays that are each sorted by modDate descending into a single descending array.
+    nonisolated static func mergeSortedDescending(
+        _ a: [(url: URL, modDate: Date)],
+        _ b: [(url: URL, modDate: Date)]
+    ) -> [(url: URL, modDate: Date)] {
+        var result: [(url: URL, modDate: Date)] = []
+        result.reserveCapacity(a.count + b.count)
+        var i = 0, j = 0
+        while i < a.count && j < b.count {
+            if a[i].modDate >= b[j].modDate {
+                result.append(a[i]); i += 1
+            } else {
+                result.append(b[j]); j += 1
+            }
+        }
+        while i < a.count { result.append(a[i]); i += 1 }
+        while j < b.count { result.append(b[j]); j += 1 }
+        return result
     }
 
     func loadMoreIfNeeded(currentSession: SessionSummary) {

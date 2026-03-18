@@ -10,9 +10,9 @@ public struct ClaudeProvider {
             .appendingPathComponent("projects")
     }
 
-    /// Return all JSONL session file URLs sorted by modification date (most recent first).
+    /// Return all JSONL session files with modification dates, sorted most-recent first.
     /// This is cheap — only reads filesystem metadata, no file contents.
-    public func listSessionFiles() throws -> [URL] {
+    public func listSessionFilesWithDates() throws -> [(url: URL, modDate: Date)] {
         let fm = FileManager.default
         guard fm.fileExists(atPath: claudeDir.path) else { return [] }
 
@@ -33,9 +33,12 @@ public struct ClaudeProvider {
             }
         }
 
-        return files
-            .sorted { $0.modDate > $1.modDate }
-            .map(\.url)
+        return files.sorted { $0.modDate > $1.modDate }
+    }
+
+    /// Return all JSONL session file URLs sorted by modification date (most recent first).
+    public func listSessionFiles() throws -> [URL] {
+        try listSessionFilesWithDates().map(\.url)
     }
 
     /// Scan a single JSONL file and return its summary. Returns nil if the file can't be parsed.
@@ -113,9 +116,14 @@ public struct ClaudeProvider {
         var model: String?
     }
 
+    private static let scanHeaderSize = 16_384 // 16KB
+
     private func scanSessionFile(_ file: URL, projectDir: URL) throws -> SessionSummary? {
-        let data = try Data(contentsOf: file)
-        let lines = data.split(separator: UInt8(ascii: "\n"))
+        let handle = try FileHandle(forReadingFrom: file)
+        let header = handle.readData(ofLength: Self.scanHeaderSize)
+        try handle.close()
+
+        let lines = header.split(separator: UInt8(ascii: "\n"))
 
         var sessionId: String?
         var cwd: String?
@@ -123,7 +131,6 @@ public struct ClaudeProvider {
         var model: String?
         var firstUserMessage: String?
         var startedAt: Date?
-        var turnCount = 0
 
         let dateFormatter = ISO8601DateFormatter()
         dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -131,10 +138,6 @@ public struct ClaudeProvider {
         for line in lines {
             guard let entry = try? JSONSerialization.jsonObject(with: Data(line)) as? [String: Any],
                   let type = entry["type"] as? String else { continue }
-
-            if type == "user" || type == "assistant" || type == "tool_result" {
-                turnCount += 1
-            }
 
             if type == "user" && firstUserMessage == nil {
                 if let msg = entry["message"] as? [String: Any],
@@ -156,6 +159,11 @@ public struct ClaudeProvider {
                     model = msg["model"] as? String
                 }
             }
+
+            // Early exit once all metadata is collected
+            if sessionId != nil && model != nil && firstUserMessage != nil && startedAt != nil {
+                break
+            }
         }
 
         guard let sid = sessionId, let start = startedAt else { return nil }
@@ -168,7 +176,7 @@ public struct ClaudeProvider {
             gitBranch: gitBranch,
             startedAt: start,
             firstUserMessage: firstUserMessage,
-            turnCount: turnCount,
+            turnCount: 0,
             filePath: file
         )
     }

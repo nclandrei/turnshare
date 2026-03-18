@@ -9,9 +9,9 @@ public struct CodexProvider {
             .appendingPathComponent(".codex")
     }
 
-    /// Return all JSONL session file URLs sorted by modification date (most recent first).
+    /// Return all JSONL session files with modification dates, sorted most-recent first.
     /// Searches both `sessions/` (nested year/month/day) and `archived_sessions/` (flat).
-    public func listSessionFiles() throws -> [URL] {
+    public func listSessionFilesWithDates() throws -> [(url: URL, modDate: Date)] {
         let fm = FileManager.default
         guard fm.fileExists(atPath: codexDir.path) else { return [] }
 
@@ -29,9 +29,12 @@ public struct CodexProvider {
             collectJSONLFiles(in: archivedDir, into: &files, fm: fm)
         }
 
-        return files
-            .sorted { $0.modDate > $1.modDate }
-            .map(\.url)
+        return files.sorted { $0.modDate > $1.modDate }
+    }
+
+    /// Return all JSONL session file URLs sorted by modification date (most recent first).
+    public func listSessionFiles() throws -> [URL] {
+        try listSessionFilesWithDates().map(\.url)
     }
 
     /// Scan a single JSONL file and return its summary. Returns nil if the file can't be parsed.
@@ -138,16 +141,22 @@ public struct CodexProvider {
         }
     }
 
+    // Codex session_meta embeds the full system prompt (~16KB), so we need
+    // a larger buffer than Claude sessions to reach the first user message.
+    private static let scanHeaderSize = 65_536 // 64KB
+
     private func scanSessionFile(_ file: URL) throws -> SessionSummary? {
-        let data = try Data(contentsOf: file)
-        let lines = data.split(separator: UInt8(ascii: "\n"))
+        let handle = try FileHandle(forReadingFrom: file)
+        let header = handle.readData(ofLength: Self.scanHeaderSize)
+        try handle.close()
+
+        let lines = header.split(separator: UInt8(ascii: "\n"))
 
         var sessionId: String?
         var cwd: String?
         var model: String?
         var firstUserMessage: String?
         var startedAt: Date?
-        var turnCount = 0
 
         for line in lines {
             guard let entry = try? JSONSerialization.jsonObject(with: Data(line)) as? [String: Any],
@@ -173,13 +182,6 @@ public struct CodexProvider {
                     let itemType = payload["type"] as? String
                     let role = payload["role"] as? String
 
-                    // Count turns that map to user/assistant/tool
-                    if itemType == "message" && (role == "user" || role == "assistant") {
-                        turnCount += 1
-                    } else if itemType == "function_call" || itemType == "function_call_output" {
-                        turnCount += 1
-                    }
-
                     // Extract first user message
                     if firstUserMessage == nil && itemType == "message" && role == "user" {
                         if let text = extractUserText(from: payload) {
@@ -189,6 +191,11 @@ public struct CodexProvider {
                 }
 
             default:
+                break
+            }
+
+            // Early exit once all metadata is collected
+            if sessionId != nil && model != nil && firstUserMessage != nil && startedAt != nil {
                 break
             }
         }
@@ -202,7 +209,7 @@ public struct CodexProvider {
             projectName: extractProjectName(from: cwd),
             startedAt: start,
             firstUserMessage: firstUserMessage,
-            turnCount: turnCount,
+            turnCount: 0,
             filePath: file
         )
     }

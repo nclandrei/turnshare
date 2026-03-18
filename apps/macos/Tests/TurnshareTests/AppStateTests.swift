@@ -1,9 +1,47 @@
 import XCTest
 @testable import SessionCore
+@testable import Turnshare
 
 /// Tests for AppState-related logic (filtered sessions, state transitions).
 /// These test the pure logic independently of the @MainActor AppState class.
 final class AppStateTests: XCTestCase {
+
+    // MARK: - Merge Sorted Descending
+
+    func testMergeSortedDescendingBothNonEmpty() {
+        let now = Date()
+        let a: [(url: URL, modDate: Date)] = [
+            (URL(fileURLWithPath: "/a3"), now.addingTimeInterval(-1)),
+            (URL(fileURLWithPath: "/a1"), now.addingTimeInterval(-5)),
+        ]
+        let b: [(url: URL, modDate: Date)] = [
+            (URL(fileURLWithPath: "/b2"), now.addingTimeInterval(-2)),
+            (URL(fileURLWithPath: "/b4"), now.addingTimeInterval(-10)),
+        ]
+        let merged = AppState.mergeSortedDescending(a, b)
+        XCTAssertEqual(merged.count, 4)
+        XCTAssertEqual(merged[0].url.lastPathComponent, "a3")
+        XCTAssertEqual(merged[1].url.lastPathComponent, "b2")
+        XCTAssertEqual(merged[2].url.lastPathComponent, "a1")
+        XCTAssertEqual(merged[3].url.lastPathComponent, "b4")
+    }
+
+    func testMergeSortedDescendingOneEmpty() {
+        let now = Date()
+        let a: [(url: URL, modDate: Date)] = [
+            (URL(fileURLWithPath: "/a1"), now),
+        ]
+        let b: [(url: URL, modDate: Date)] = []
+        let merged = AppState.mergeSortedDescending(a, b)
+        XCTAssertEqual(merged.count, 1)
+        XCTAssertEqual(merged[0].url.lastPathComponent, "a1")
+    }
+
+    func testMergeSortedDescendingBothEmpty() {
+        let a: [(url: URL, modDate: Date)] = []
+        let b: [(url: URL, modDate: Date)] = []
+        XCTAssertTrue(AppState.mergeSortedDescending(a, b).isEmpty)
+    }
 
     // MARK: - Filtered Sessions
 

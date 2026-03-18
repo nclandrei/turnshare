@@ -115,6 +115,39 @@ final class CodexProviderTests: XCTestCase {
         XCTAssertEqual(files.count, 1)
     }
 
+    func testListSessionFilesWithDatesReturnsTuples() throws {
+        let archivedDir = tempDir.appendingPathComponent("archived_sessions")
+        try FileManager.default.createDirectory(at: archivedDir, withIntermediateDirectories: true)
+
+        let file = archivedDir.appendingPathComponent("test.jsonl")
+        try makeMinimalCodexJSONL().write(to: file, atomically: true, encoding: .utf8)
+
+        let provider = CodexProvider(codexDir: tempDir)
+        let tuples = try provider.listSessionFilesWithDates()
+        XCTAssertEqual(tuples.count, 1)
+        XCTAssertEqual(tuples.first?.url.lastPathComponent, "test.jsonl")
+        XCTAssertNotEqual(tuples.first?.modDate, .distantPast)
+    }
+
+    func testListSessionFilesWithDatesSortedDescending() throws {
+        let archivedDir = tempDir.appendingPathComponent("archived_sessions")
+        try FileManager.default.createDirectory(at: archivedDir, withIntermediateDirectories: true)
+
+        let older = archivedDir.appendingPathComponent("older.jsonl")
+        try makeMinimalCodexJSONL(sessionId: "old").write(to: older, atomically: true, encoding: .utf8)
+
+        Thread.sleep(forTimeInterval: 0.05)
+
+        let newer = archivedDir.appendingPathComponent("newer.jsonl")
+        try makeMinimalCodexJSONL(sessionId: "new").write(to: newer, atomically: true, encoding: .utf8)
+
+        let provider = CodexProvider(codexDir: tempDir)
+        let tuples = try provider.listSessionFilesWithDates()
+        XCTAssertEqual(tuples.count, 2)
+        XCTAssertEqual(tuples[0].url.lastPathComponent, "newer.jsonl")
+        XCTAssertTrue(tuples[0].modDate >= tuples[1].modDate)
+    }
+
     // MARK: - Session Scanning
 
     func testScanSessionReturnsSummary() throws {
@@ -150,15 +183,15 @@ final class CodexProviderTests: XCTestCase {
         XCTAssertNil(provider.scanSession(at: file))
     }
 
-    func testScanSessionCountsTurns() throws {
+    func testScanSessionReturnZeroTurnCount() throws {
         let file = tempDir.appendingPathComponent("turns.jsonl")
         try makeFullCodexJSONL().write(to: file, atomically: true, encoding: .utf8)
 
         let provider = CodexProvider(codexDir: tempDir)
         let summary = provider.scanSession(at: file)
         XCTAssertNotNil(summary)
-        // user message + assistant message + function_call + function_call_output = 4
-        XCTAssertEqual(summary?.turnCount, 4)
+        // Partial-read scan does not count turns
+        XCTAssertEqual(summary?.turnCount, 0)
     }
 
     func testScanSessionExtractsFirstUserMessage() throws {
