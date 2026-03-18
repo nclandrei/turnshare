@@ -1,0 +1,110 @@
+name: Release
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+
+concurrency:
+  group: release
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: apps/macos
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Set version
+        id: version
+        run: echo "tag=$(date -u +'%Y%m%d.%H%M%S')" >> "$GITHUB_OUTPUT"
+
+      - name: Build release binary
+        run: swift build -c release
+
+      - name: Generate app icon
+        run: |
+          ICON_SRC="../../Design/Logo/turnshare-app-icon-1024.png"
+          ICONSET="Turnshare.iconset"
+          mkdir -p "$ICONSET"
+          sips -z 16 16     "$ICON_SRC" --out "$ICONSET/icon_16x16.png"
+          sips -z 32 32     "$ICON_SRC" --out "$ICONSET/icon_16x16@2x.png"
+          sips -z 32 32     "$ICON_SRC" --out "$ICONSET/icon_32x32.png"
+          sips -z 64 64     "$ICON_SRC" --out "$ICONSET/icon_32x32@2x.png"
+          sips -z 128 128   "$ICON_SRC" --out "$ICONSET/icon_128x128.png"
+          sips -z 256 256   "$ICON_SRC" --out "$ICONSET/icon_128x128@2x.png"
+          sips -z 256 256   "$ICON_SRC" --out "$ICONSET/icon_256x256.png"
+          sips -z 512 512   "$ICON_SRC" --out "$ICONSET/icon_256x256@2x.png"
+          sips -z 512 512   "$ICON_SRC" --out "$ICONSET/icon_512x512.png"
+          sips -z 1024 1024 "$ICON_SRC" --out "$ICONSET/icon_512x512@2x.png"
+          iconutil -c icns "$ICONSET" -o Turnshare.icns
+
+      - name: Create .app bundle
+        run: |
+          APP="Turnshare.app"
+          BIN_PATH=$(swift build -c release --show-bin-path)
+          mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+          cp "$BIN_PATH/Turnshare" "$APP/Contents/MacOS/"
+          if [ -d "$BIN_PATH/Turnshare_Turnshare.bundle" ]; then
+            cp -R "$BIN_PATH/Turnshare_Turnshare.bundle" "$APP/Contents/Resources/"
+          fi
+          cp Turnshare.icns "$APP/Contents/Resources/AppIcon.icns"
+          cat > "$APP/Contents/Info.plist" << 'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleName</key>
+            <string>Turnshare</string>
+            <key>CFBundleDisplayName</key>
+            <string>Turnshare</string>
+            <key>CFBundleIdentifier</key>
+            <string>com.nclandrei.turnshare</string>
+            <key>CFBundleVersion</key>
+            <string>${{ steps.version.outputs.tag }}</string>
+            <key>CFBundleShortVersionString</key>
+            <string>0.1.0</string>
+            <key>CFBundleExecutable</key>
+            <string>Turnshare</string>
+            <key>CFBundlePackageType</key>
+            <string>APPL</string>
+            <key>CFBundleIconFile</key>
+            <string>AppIcon</string>
+            <key>LSMinimumSystemVersion</key>
+            <string>14.0</string>
+            <key>LSUIElement</key>
+            <true/>
+            <key>NSHighResolutionCapable</key>
+            <true/>
+          </dict>
+          </plist>
+          PLIST
+
+      - name: Codesign
+        run: codesign --force --deep --sign - Turnshare.app
+
+      - name: Package
+        run: ditto -c -k --sequesterRsrc --keepParent Turnshare.app Turnshare.zip
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${{ steps.version.outputs.tag }}"
+          SHORT_SHA=$(echo "${{ github.event.workflow_run.head_sha }}" | cut -c1-7)
+          gh release create "$TAG" \
+            --title "Turnshare ${TAG}" \
+            --notes "Automated build from main (${SHORT_SHA})" \
+            --target "${{ github.event.workflow_run.head_sha }}" \
+            Turnshare.zip
