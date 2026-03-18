@@ -9,27 +9,29 @@ struct PublishHUDView: View {
                 ProgressView()
                     .controlSize(.small)
                 Text("Publishing...")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.primary)
             } else if appState.lastPublishedURL != nil {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundColor(.green)
-                    .font(.caption)
+                    .font(.system(size: 13))
                 Text("Copied!")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.primary)
             } else if let error = appState.publishError {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundColor(.red)
-                    .font(.caption)
+                    .font(.system(size: 13))
                 Text(error)
-                    .font(.caption)
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundColor(.red)
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .frame(height: 28)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 6)
+        .fixedSize()
     }
 }

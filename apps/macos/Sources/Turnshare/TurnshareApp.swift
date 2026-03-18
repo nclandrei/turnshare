@@ -243,8 +243,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Publish HUD
 
     private static func makeHUDPanel(appState: AppState) -> NSPanel {
+        let hostingView = NSHostingView(
+            rootView: PublishHUDView().environmentObject(appState)
+        )
+
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 220, height: 36),
+            contentRect: NSRect(x: 0, y: 0, width: 1, height: 1),
             styleMask: [.nonactivatingPanel, .borderless],
             backing: .buffered,
             defer: false
@@ -255,19 +259,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.backgroundColor = .clear
         panel.hasShadow = true
 
-        let hostingView = NSHostingView(
-            rootView: PublishHUDView().environmentObject(appState)
-        )
-        hostingView.wantsLayer = true
-        hostingView.layer?.cornerRadius = 10
-        hostingView.layer?.masksToBounds = true
-
         let visualEffect = NSVisualEffectView()
         visualEffect.material = .popover
         visualEffect.state = .active
         visualEffect.wantsLayer = true
         visualEffect.layer?.cornerRadius = 10
         visualEffect.layer?.masksToBounds = true
+
+        hostingView.wantsLayer = true
+        hostingView.layer?.cornerRadius = 10
+        hostingView.layer?.masksToBounds = true
         visualEffect.addSubview(hostingView)
 
         hostingView.translatesAutoresizingMaskIntoConstraints = false
@@ -283,8 +284,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func showHUD() {
+        // Cancel any pending dismiss from a previous publish
+        hudDismissTask?.cancel()
+        hudDismissTask = nil
+
         guard let button = statusItem.button,
               let buttonWindow = button.window else { return }
+
+        // Let the hosting view compute its natural size
+        if let hostingView = (hudPanel.contentView as? NSVisualEffectView)?.subviews.first as? NSView {
+            let fitting = hostingView.fittingSize
+            let size = NSSize(width: max(fitting.width, 120), height: max(fitting.height, 40))
+            hudPanel.setContentSize(size)
+        }
 
         let buttonFrame = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
         let hudSize = hudPanel.frame.size
