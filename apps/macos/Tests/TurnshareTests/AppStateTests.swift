@@ -199,6 +199,50 @@ final class AppStateTests: XCTestCase {
         // There's no selectedIndex concept in instant mode
     }
 
+    // MARK: - Publish Cache
+
+    func testPublishCacheLookupAndStore() {
+        let cacheKey = "publishedGists"
+        // Clean slate
+        UserDefaults.standard.removeObject(forKey: cacheKey)
+
+        // Empty cache returns nil
+        let cache1 = UserDefaults.standard.dictionary(forKey: cacheKey) as? [String: String] ?? [:]
+        XCTAssertNil(cache1["sess-abc"])
+
+        // Store a mapping
+        var cache2 = cache1
+        cache2["sess-abc"] = "gist-123"
+        UserDefaults.standard.set(cache2, forKey: cacheKey)
+
+        // Retrieve it
+        let cache3 = UserDefaults.standard.dictionary(forKey: cacheKey) as? [String: String] ?? [:]
+        XCTAssertEqual(cache3["sess-abc"], "gist-123")
+
+        // Other keys still nil
+        XCTAssertNil(cache3["sess-other"])
+
+        // Clean up
+        UserDefaults.standard.removeObject(forKey: cacheKey)
+    }
+
+    func testPublishCacheMultipleSessions() {
+        let cacheKey = "publishedGists"
+        UserDefaults.standard.removeObject(forKey: cacheKey)
+
+        var cache: [String: String] = [:]
+        cache["sess-1"] = "gist-aaa"
+        cache["sess-2"] = "gist-bbb"
+        UserDefaults.standard.set(cache, forKey: cacheKey)
+
+        let loaded = UserDefaults.standard.dictionary(forKey: cacheKey) as? [String: String] ?? [:]
+        XCTAssertEqual(loaded["sess-1"], "gist-aaa")
+        XCTAssertEqual(loaded["sess-2"], "gist-bbb")
+        XCTAssertEqual(loaded.count, 2)
+
+        UserDefaults.standard.removeObject(forKey: cacheKey)
+    }
+
     // MARK: - Helpers
 
     /// Mirrors the shortcut index assignment logic: items 0-8 get 1-9, rest get nil.

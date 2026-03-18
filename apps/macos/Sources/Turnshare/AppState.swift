@@ -54,6 +54,23 @@ final class AppState: ObservableObject {
     private let auth: GitHubAuth
     private let publisher: GistPublisher
 
+    // MARK: - Publish Cache (sessionId → gistId)
+
+    private static let publishCacheKey = "publishedGists"
+
+    /// Returns the cached gist ID for a session, if previously published.
+    func cachedGistId(for sessionId: String) -> String? {
+        let cache = UserDefaults.standard.dictionary(forKey: Self.publishCacheKey) as? [String: String] ?? [:]
+        return cache[sessionId]
+    }
+
+    /// Stores a gist ID for a session after successful publish.
+    private func cacheGistId(_ gistId: String, for sessionId: String) {
+        var cache = UserDefaults.standard.dictionary(forKey: Self.publishCacheKey) as? [String: String] ?? [:]
+        cache[sessionId] = gistId
+        UserDefaults.standard.set(cache, forKey: Self.publishCacheKey)
+    }
+
     static let githubClientId = "Ov23liMEqPKk3wK68g1w"
 
     // Base URL for the Turnshare web renderer (GitHub Pages)
@@ -263,6 +280,19 @@ final class AppState: ObservableObject {
     }
 
     func publish(sessionId: String) {
+        guard sessions.first(where: { $0.id == sessionId }) != nil else { return }
+
+        // Reuse existing gist if this session was already published
+        if let cachedGistId = cachedGistId(for: sessionId) {
+            let url = "\(Self.rendererBaseURL)#\(cachedGistId)"
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(url, forType: .string)
+            lastPublishedURL = url
+            onPublishInitiated?()
+            onPublishCompleted?()
+            return
+        }
+
         guard let summary = sessions.first(where: { $0.id == sessionId }) else { return }
         isPublishing = true
         publishError = nil
@@ -276,6 +306,8 @@ final class AppState: ObservableObject {
                 let session = try claudeProvider.parseSession(at: summary.filePath)
                 let gistId = try await publisher.publish(session: session)
                 let url = "\(Self.rendererBaseURL)#\(gistId)"
+
+                self.cacheGistId(gistId, for: sessionId)
 
                 // Copy URL to clipboard
                 NSPasteboard.general.clearContents()
