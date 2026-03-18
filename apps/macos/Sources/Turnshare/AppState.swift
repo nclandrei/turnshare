@@ -17,6 +17,9 @@ final class AppState: ObservableObject {
     @Published var authUserCode: String?
     @Published var authError: String?
 
+    // Quick-publish modifier symbol (reactive, drives shortcut hints in rows)
+    @Published var quickPublishSymbol: String = QuickPublishConfig.shared.modifier.symbol
+
     // Publish state
     @Published var isPublishing = false
     @Published var lastPublishedURL: String?
@@ -33,6 +36,9 @@ final class AppState: ObservableObject {
 
     /// Called when the hovered preview session changes (nil = hide preview panel).
     var onPreviewChanged: ((String?) -> Void)?
+
+    /// Called when the quick-publish modifier key is changed in settings.
+    var onQuickPublishModifierChanged: (() -> Void)?
 
     private let claudeProvider = ClaudeProvider()
     private let auth: GitHubAuth
@@ -162,6 +168,13 @@ final class AppState: ObservableObject {
         previewTurns = []
         isLoadingPreview = false
         onPreviewChanged?(nil)
+    }
+
+    // MARK: - Quick Publish Modifier
+
+    func quickPublishModifierChanged() {
+        quickPublishSymbol = QuickPublishConfig.shared.modifier.symbol
+        onQuickPublishModifierChanged?()
     }
 
     // MARK: - Publish

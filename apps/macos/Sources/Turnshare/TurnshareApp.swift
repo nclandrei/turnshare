@@ -241,9 +241,10 @@ final class FloatingPanel: NSPanel {
     // Allow the panel to become key so text fields work
     override var canBecomeKey: Bool { true }
 
-    // Handle Cmd+1 through Cmd+9 to quick-publish
+    // Handle modifier+1 through modifier+9 to quick-publish
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        if event.modifierFlags.contains(.command),
+        let requiredModifier = QuickPublishConfig.shared.modifier.eventFlag
+        if event.modifierFlags.contains(requiredModifier),
            let chars = event.charactersIgnoringModifiers,
            chars.count == 1,
            let num = Int(chars),

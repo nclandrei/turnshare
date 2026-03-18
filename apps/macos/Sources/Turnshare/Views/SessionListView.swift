@@ -100,25 +100,13 @@ struct SessionListView: View {
                 Divider()
             }
 
-            // Settings row
+            // Settings panel
             if showSettings {
-                HStack {
-                    HotKeyRecorderView(
-                        currentCombo: HotKeyConfig.shared.keyCombo,
-                        onRecord: { combo in
-                            if let delegate = NSApp.delegate as? AppDelegate {
-                                delegate.updateHotKey(combo)
-                            }
-                        }
-                    )
-                    Spacer()
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
+                SettingsView()
                 Divider()
             }
 
-            // Auth / footer
+            // Footer
             FooterView(showSettings: $showSettings)
         }
         .onAppear {
@@ -144,67 +132,33 @@ struct FooterView: View {
             }
             .buttonStyle(.plain)
 
-            if appState.isAuthenticated {
-                // Signed in
-                if let username = appState.githubUsername {
-                    Image(systemName: "person.circle.fill")
-                        .foregroundColor(.secondary)
-                        .font(.caption)
-                    Text(username)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-
-                Spacer()
-
-                Button("Sign Out") { appState.signOut() }
+            if appState.isAuthenticated, let username = appState.githubUsername {
+                Image(systemName: "person.circle.fill")
+                    .foregroundColor(.green)
                     .font(.caption)
-                    .buttonStyle(.plain)
+                Text(username)
+                    .font(.caption)
                     .foregroundColor(.secondary)
             } else if appState.isAuthenticating {
-                // Device flow in progress
-                if let code = appState.authUserCode {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Enter code on GitHub:")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Text(code)
-                            .font(.system(.body, design: .monospaced))
-                            .fontWeight(.bold)
-                            .textSelection(.enabled)
-                    }
-                    Spacer()
-                    ProgressView()
-                        .controlSize(.small)
-                } else {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text("Connecting to GitHub...")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Spacer()
-                }
-            } else {
-                // Not signed in
-                if let error = appState.authError {
-                    Image(systemName: "exclamationmark.triangle")
-                        .foregroundColor(.red)
-                        .font(.caption)
-                    Text(error)
-                        .font(.caption)
-                        .foregroundColor(.red)
-                        .lineLimit(1)
-                    Spacer()
-                }
-
-                Text("\(appState.filteredSessions.count) sessions")
+                ProgressView()
+                    .controlSize(.small)
+                Text("Authenticating...")
                     .font(.caption)
                     .foregroundColor(.secondary)
-                Spacer()
-                Button("Sign in with GitHub") { appState.startSignIn() }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
+            } else if !appState.isAuthenticated {
+                Image(systemName: "person.circle")
+                    .foregroundColor(.secondary)
+                    .font(.caption)
+                Text("Not signed in")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
+
+            Spacer()
+
+            Text("\(appState.filteredSessions.count) sessions")
+                .font(.caption)
+                .foregroundColor(.secondary)
         }
         .padding(10)
     }
@@ -213,6 +167,7 @@ struct FooterView: View {
 // MARK: - Session Row
 
 struct SessionRowView: View {
+    @EnvironmentObject var appState: AppState
     let session: SessionSummary
     /// 1-based shortcut number (nil for items beyond 9).
     let shortcutIndex: Int?
@@ -262,9 +217,9 @@ struct SessionRowView: View {
                     .foregroundStyle(.tertiary)
             }
 
-            // Shortcut hint (⌘1, ⌘2, …)
+            // Shortcut hint (⌘1, ⌥1, ⌃1, …)
             if let idx = shortcutIndex {
-                Text("⌘\(idx)")
+                Text("\(appState.quickPublishSymbol)\(idx)")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
                     .frame(minWidth: 28, alignment: .trailing)

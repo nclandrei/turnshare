@@ -89,11 +89,53 @@ final class AppStateTests: XCTestCase {
         XCTAssertNil(shortcutIndex(for: 100))
     }
 
+    // MARK: - Shortcut Hint Display
+
+    func testShortcutHintFormatWithCommandModifier() {
+        let symbol = "\u{2318}"
+        let hint = shortcutHint(symbol: symbol, index: 1)
+        XCTAssertEqual(hint, "\u{2318}1")
+    }
+
+    func testShortcutHintFormatWithOptionModifier() {
+        let symbol = "\u{2325}"
+        let hint = shortcutHint(symbol: symbol, index: 3)
+        XCTAssertEqual(hint, "\u{2325}3")
+    }
+
+    func testShortcutHintFormatWithControlModifier() {
+        let symbol = "\u{2303}"
+        let hint = shortcutHint(symbol: symbol, index: 9)
+        XCTAssertEqual(hint, "\u{2303}9")
+    }
+
+    func testShortcutHintNilForIndexBeyond9() {
+        // Items at index >= 9 should not get a shortcut hint
+        XCTAssertNil(shortcutIndex(for: 9))
+        XCTAssertNil(shortcutIndex(for: 10))
+    }
+
+    func testShortcutHintCoversRange1Through9() {
+        for i in 0..<9 {
+            let idx = shortcutIndex(for: i)
+            XCTAssertNotNil(idx)
+            XCTAssertEqual(idx, i + 1)
+            // Hint should be symbol + number
+            let hint = shortcutHint(symbol: "\u{2318}", index: idx!)
+            XCTAssertEqual(hint, "\u{2318}\(i + 1)")
+        }
+    }
+
     // MARK: - Helpers
 
     /// Mirrors the shortcut index assignment logic: items 0-8 get 1-9, rest get nil.
     private func shortcutIndex(for index: Int) -> Int? {
         index < 9 ? index + 1 : nil
+    }
+
+    /// Mirrors the shortcut hint format: modifier symbol + index number.
+    private func shortcutHint(symbol: String, index: Int) -> String {
+        "\(symbol)\(index)"
     }
 
     /// Mirrors AppState.publishByIndex — resolves the session at a given index
