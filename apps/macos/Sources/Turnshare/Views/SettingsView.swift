@@ -15,7 +15,7 @@ struct SettingsView: View {
                 HotKeyRecorderView(
                     currentCombo: HotKeyConfig.shared.keyCombo,
                     onRecord: { combo in
-                        if let delegate = NSApp.delegate as? AppDelegate {
+                        if let delegate = AppDelegate.shared {
                             delegate.updateHotKey(combo)
                         }
                     }

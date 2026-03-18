@@ -14,6 +14,8 @@ struct TurnshareApp: App {
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    static private(set) var shared: AppDelegate!
+
     private var statusItem: NSStatusItem!
     private var panel: FloatingPanel!
     private var previewPanel: NSPanel!
@@ -22,7 +24,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let hotKeyConfig = HotKeyConfig.shared
     private var clickOutsideMonitor: Any?
 
+    /// When set, the global hotkey handler captures the combo instead of toggling the panel.
+    var hotKeyRecordHandler: ((KeyCombo) -> Void)?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
+        Self.shared = self
+
         // Hide from dock
         NSApp.setActivationPolicy(.accessory)
 
@@ -74,7 +81,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hotKey = HotKey(keyCombo: hotKeyConfig.keyCombo)
         hotKey?.keyDownHandler = { [weak self] in
             Task { @MainActor in
-                self?.togglePanel()
+                if let handler = self?.hotKeyRecordHandler {
+                    if let combo = self?.hotKey?.keyCombo {
+                        handler(combo)
+                    }
+                } else {
+                    self?.togglePanel()
+                }
             }
         }
     }
