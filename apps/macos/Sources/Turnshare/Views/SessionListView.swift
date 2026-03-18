@@ -288,8 +288,11 @@ struct PreviewPanelView: View {
                         .padding(12)
                     }
                 }
+            } else {
+                Spacer()
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var currentSession: SessionSummary? {
