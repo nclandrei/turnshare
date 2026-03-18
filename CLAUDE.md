@@ -8,12 +8,13 @@ macOS menu bar app for sharing AI coding sessions via GitHub Gists. Supports Cla
 # Build
 cd apps/macos && swift build
 
-# Run tests (50 tests across 4 test targets)
+# Run tests (122 tests across 5 test targets)
 cd apps/macos && swift test
 
 # Run specific test target
 cd apps/macos && swift test --filter SessionCoreTests
 cd apps/macos && swift test --filter ProviderClaudeTests
+cd apps/macos && swift test --filter ProviderCodexTests
 cd apps/macos && swift test --filter PublisherGistTests
 cd apps/macos && swift test --filter TurnshareTests
 ```
@@ -29,7 +30,8 @@ apps/macos/                    # Swift Package (macOS 14+, SPM 5.9)
     Turnshare/                 # Main app (menu bar, floating panel, hotkey)
   Tests/
     SessionCoreTests/          # Model encode/decode tests
-    ProviderClaudeTests/       # JSONL parsing tests
+    ProviderClaudeTests/       # Claude JSONL parsing tests
+    ProviderCodexTests/        # Codex JSONL parsing tests
     PublisherGistTests/        # Gist payload structure tests
     TurnshareTests/            # AppState logic, preview, hotkey config tests
 
