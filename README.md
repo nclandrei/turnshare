@@ -25,9 +25,17 @@ Sessions are read directly from `~/.claude/projects/` and `~/.codex/` — no con
 
 ## Install
 
+### Homebrew (recommended)
+
+```bash
+brew install --cask nclandrei/tap/turnshare
+```
+
+### Manual download
+
 Download `Turnshare.zip` from the [latest release](https://github.com/nclandrei/turnshare/releases/latest), unzip, and drag to `/Applications`.
 
-> Requires macOS 14 (Sonoma) or later. The app is ad-hoc signed — on first launch you may need to right-click and choose Open.
+> Requires macOS 14 (Sonoma) or later. The app is signed and notarized — it opens without Gatekeeper warnings.
 
 ### Build from source
 

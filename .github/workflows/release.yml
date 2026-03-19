@@ -30,6 +30,31 @@ jobs:
         id: version
         run: echo "tag=$(date -u +'%Y%m%d.%H%M%S')" >> "$GITHUB_OUTPUT"
 
+      - name: Import signing certificate
+        env:
+          APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          CERT_PATH="$RUNNER_TEMP/certificate.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 32)"
+
+          echo "$APPLE_CERTIFICATE_P12" | base64 --decode > "$CERT_PATH"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          security import "$CERT_PATH" \
+            -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -A \
+            -t cert \
+            -f pkcs12 \
+            -k "$KEYCHAIN_PATH"
+
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
+
       - name: Build release binary
         run: swift build -c release
 
@@ -92,10 +117,53 @@ jobs:
           PLIST
 
       - name: Codesign
-        run: codesign --force --deep --sign - Turnshare.app
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          IDENTITY="Developer ID Application: ($APPLE_TEAM_ID)"
+          ENTITLEMENTS="Turnshare.entitlements"
 
-      - name: Package
+          # Sign nested bundles first
+          find Turnshare.app/Contents -name "*.bundle" -o -name "*.dylib" -o -name "*.framework" | while read item; do
+            codesign --force --sign "$IDENTITY" --options runtime --timestamp "$item"
+          done
+
+          # Sign the main app
+          codesign --force --sign "$IDENTITY" \
+            --options runtime \
+            --entitlements "$ENTITLEMENTS" \
+            --timestamp \
+            Turnshare.app
+
+      - name: Verify codesign
+        run: codesign -dvv Turnshare.app
+
+      - name: Package for notarization
         run: ditto -c -k --sequesterRsrc --keepParent Turnshare.app Turnshare.zip
+
+      - name: Notarize
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          xcrun notarytool submit Turnshare.zip \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_ID_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+
+      - name: Staple
+        run: xcrun stapler staple Turnshare.app
+
+      - name: Re-package with stapled ticket
+        run: |
+          rm Turnshare.zip
+          ditto -c -k --sequesterRsrc --keepParent Turnshare.app Turnshare.zip
+
+      - name: Compute SHA256
+        id: sha
+        run: echo "sha256=$(shasum -a 256 Turnshare.zip | awk '{print $1}')" >> "$GITHUB_OUTPUT"
 
       - name: Create release
         env:
@@ -105,6 +173,47 @@ jobs:
           SHORT_SHA=$(echo "${{ github.event.workflow_run.head_sha }}" | cut -c1-7)
           gh release create "$TAG" \
             --title "Turnshare ${TAG}" \
-            --notes "Automated build from main (${SHORT_SHA})" \
+            --notes "Automated build from main (${SHORT_SHA}). Signed and notarized." \
             --target "${{ github.event.workflow_run.head_sha }}" \
             Turnshare.zip
+
+      - name: Update Homebrew tap
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          TAG="v${{ steps.version.outputs.tag }}"
+          SHA256="${{ steps.sha.outputs.sha256 }}"
+          URL="https://github.com/nclandrei/turnshare/releases/download/${TAG}/Turnshare.zip"
+
+          git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/nclandrei/homebrew-tap.git" "$RUNNER_TEMP/homebrew-tap"
+
+          cat > "$RUNNER_TEMP/homebrew-tap/Casks/turnshare.rb" << CASK
+          cask "turnshare" do
+            version "${TAG#v}"
+            sha256 "${SHA256}"
+
+            url "${URL}"
+            name "Turnshare"
+            desc "macOS menu bar app for sharing AI coding sessions via GitHub Gists"
+            homepage "https://github.com/nclandrei/turnshare"
+
+            depends_on macos: ">= :sonoma"
+
+            app "Turnshare.app"
+
+            zap trash: [
+              "~/Library/Preferences/com.nclandrei.turnshare.plist",
+            ]
+          end
+          CASK
+
+          cd "$RUNNER_TEMP/homebrew-tap"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Casks/turnshare.rb
+          git commit -m "Update turnshare to ${TAG}"
+          git push
+
+      - name: Cleanup keychain
+        if: always()
+        run: security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true
