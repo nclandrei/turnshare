@@ -38,7 +38,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Create status bar item
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = statusItem.button {
-            if let icon = Bundle.module.image(forResource: "menubar-icon") {
+            if let icon = Bundle.main.image(forResource: "menubar-icon") {
                 icon.isTemplate = true
                 icon.size = NSSize(width: 18, height: 18)
                 button.image = icon

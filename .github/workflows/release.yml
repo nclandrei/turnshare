@@ -81,10 +81,8 @@ jobs:
           BIN_PATH=$(swift build -c release --show-bin-path)
           mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
           cp "$BIN_PATH/Turnshare" "$APP/Contents/MacOS/"
-          if [ -d "$BIN_PATH/Turnshare_Turnshare.bundle" ]; then
-            cp -R "$BIN_PATH/Turnshare_Turnshare.bundle" "$APP/"
-          fi
           cp Turnshare.icns "$APP/Contents/Resources/AppIcon.icns"
+          cp Sources/Turnshare/Resources/menubar-icon*.png "$APP/Contents/Resources/"
           cat > "$APP/Contents/Info.plist" << 'PLIST'
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

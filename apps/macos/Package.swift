@@ -13,8 +13,7 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "Turnshare",
-            dependencies: ["SessionCore", "ProviderClaude", "ProviderCodex", "ProviderOpenCode", "PublisherGist", "HotKey"],
-            resources: [.process("Resources")]
+            dependencies: ["SessionCore", "ProviderClaude", "ProviderCodex", "ProviderOpenCode", "PublisherGist", "HotKey"]
         ),
         .target(name: "SessionCore"),
         .target(name: "ProviderClaude", dependencies: ["SessionCore"]),
