@@ -82,7 +82,7 @@ jobs:
           mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
           cp "$BIN_PATH/Turnshare" "$APP/Contents/MacOS/"
           if [ -d "$BIN_PATH/Turnshare_Turnshare.bundle" ]; then
-            cp -R "$BIN_PATH/Turnshare_Turnshare.bundle" "$APP/Contents/Resources/"
+            cp -R "$BIN_PATH/Turnshare_Turnshare.bundle" "$APP/"
           fi
           cp Turnshare.icns "$APP/Contents/Resources/AppIcon.icns"
           cat > "$APP/Contents/Info.plist" << 'PLIST'
