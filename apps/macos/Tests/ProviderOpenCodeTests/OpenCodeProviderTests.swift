@@ -272,11 +272,11 @@ final class OpenCodeProviderTests: XCTestCase {
             TestMessage(id: "msg_t", sessionId: "ses_tool", role: "assistant", modelID: "gpt-5", timeCreated: 1100),
         ], parts: [
             TestPart(id: "prt_t", messageId: "msg_t", sessionId: "ses_tool",
-                     type: "tool-invocation",
-                     toolInvocation: TestToolInvocation(
-                        toolName: "read_file", toolCallId: "call_1",
-                        args: ["path": "/tmp/file.txt"],
-                        state: "result", result: "file contents here"),
+                     type: "tool",
+                     toolPart: TestToolPart(
+                        toolName: "read_file", callID: "call_1",
+                        input: ["path": "/tmp/file.txt"],
+                        status: "completed", output: "file contents here", error: nil),
                      timeCreated: 1100),
         ])
 
@@ -308,11 +308,11 @@ final class OpenCodeProviderTests: XCTestCase {
             TestMessage(id: "msg_e", sessionId: "ses_err", role: "assistant", modelID: "gpt-5", timeCreated: 1100),
         ], parts: [
             TestPart(id: "prt_e", messageId: "msg_e", sessionId: "ses_err",
-                     type: "tool-invocation",
-                     toolInvocation: TestToolInvocation(
-                        toolName: "exec_cmd", toolCallId: "call_err",
-                        args: ["cmd": "rm -rf /"],
-                        state: "error", result: "Permission denied"),
+                     type: "tool",
+                     toolPart: TestToolPart(
+                        toolName: "exec_cmd", callID: "call_err",
+                        input: ["cmd": "rm -rf /"],
+                        status: "error", output: nil, error: "Permission denied"),
                      timeCreated: 1100),
         ])
 
@@ -326,26 +326,26 @@ final class OpenCodeProviderTests: XCTestCase {
         XCTAssertEqual(result.output, "Permission denied")
     }
 
-    func testParseSessionToolInvocationCallState() throws {
-        // "call" state = pending, no result yet → only toolUse, no toolResult
+    func testParseSessionToolPendingState() throws {
+        // "pending" state → only toolUse, no toolResult
         try makeTestDB(at: dbPath, sessions: [
             TestSession(id: "ses_call", directory: "/tmp", timeCreated: 1000, timeUpdated: 2000),
         ], messages: [
             TestMessage(id: "msg_c", sessionId: "ses_call", role: "assistant", modelID: "gpt-5", timeCreated: 1100),
         ], parts: [
             TestPart(id: "prt_c", messageId: "msg_c", sessionId: "ses_call",
-                     type: "tool-invocation",
-                     toolInvocation: TestToolInvocation(
-                        toolName: "read_file", toolCallId: "call_pend",
-                        args: ["path": "/tmp/f.txt"],
-                        state: "call", result: nil),
+                     type: "tool",
+                     toolPart: TestToolPart(
+                        toolName: "read_file", callID: "call_pend",
+                        input: ["path": "/tmp/f.txt"],
+                        status: "pending", output: nil, error: nil),
                      timeCreated: 1100),
         ])
 
         let provider = OpenCodeProvider(dbPath: dbPath)
         let session = try provider.parseSession(at: makeVirtualURL(dbPath: dbPath, sessionId: "ses_call"))
 
-        // Only toolUse turn, no toolResult for pending calls
+        // Only toolUse turn, no toolResult for pending state
         XCTAssertEqual(session.turns.count, 1)
         XCTAssertEqual(session.turns[0].role, .assistant)
         guard case .toolUse(let toolUse) = session.turns[0].content.first else {
@@ -415,10 +415,10 @@ final class OpenCodeProviderTests: XCTestCase {
             TestMessage(id: "msg_tr", sessionId: "ses_trunc", role: "assistant", modelID: "gpt-5", timeCreated: 1100),
         ], parts: [
             TestPart(id: "prt_tr", messageId: "msg_tr", sessionId: "ses_trunc",
-                     type: "tool-invocation",
-                     toolInvocation: TestToolInvocation(
-                        toolName: "exec_cmd", toolCallId: "call_long",
-                        args: [:], state: "result", result: longResult),
+                     type: "tool",
+                     toolPart: TestToolPart(
+                        toolName: "exec_cmd", callID: "call_long",
+                        input: [:], status: "completed", output: longResult, error: nil),
                      timeCreated: 1100),
         ])
 
@@ -438,16 +438,16 @@ final class OpenCodeProviderTests: XCTestCase {
             TestMessage(id: "msg_mt", sessionId: "ses_mt", role: "assistant", modelID: "gpt-5", timeCreated: 1100),
         ], parts: [
             TestPart(id: "prt_mt1", messageId: "msg_mt", sessionId: "ses_mt",
-                     type: "tool-invocation",
-                     toolInvocation: TestToolInvocation(
-                        toolName: "read_file", toolCallId: "call_a",
-                        args: ["path": "/a.txt"], state: "result", result: "content A"),
+                     type: "tool",
+                     toolPart: TestToolPart(
+                        toolName: "read_file", callID: "call_a",
+                        input: ["path": "/a.txt"], status: "completed", output: "content A", error: nil),
                      timeCreated: 1100),
             TestPart(id: "prt_mt2", messageId: "msg_mt", sessionId: "ses_mt",
-                     type: "tool-invocation",
-                     toolInvocation: TestToolInvocation(
-                        toolName: "read_file", toolCallId: "call_b",
-                        args: ["path": "/b.txt"], state: "result", result: "content B"),
+                     type: "tool",
+                     toolPart: TestToolPart(
+                        toolName: "read_file", callID: "call_b",
+                        input: ["path": "/b.txt"], status: "completed", output: "content B", error: nil),
                      timeCreated: 1200),
         ])
 
@@ -556,11 +556,11 @@ final class OpenCodeProviderTests: XCTestCase {
             TestMessage(id: "msg_args", sessionId: "ses_args", role: "assistant", modelID: "gpt-5", timeCreated: 1100),
         ], parts: [
             TestPart(id: "prt_args", messageId: "msg_args", sessionId: "ses_args",
-                     type: "tool-invocation",
-                     toolInvocation: TestToolInvocation(
-                        toolName: "write_file", toolCallId: "call_w",
-                        args: ["path": "/tmp/out.txt", "content": "hello"],
-                        state: "result", result: "ok"),
+                     type: "tool",
+                     toolPart: TestToolPart(
+                        toolName: "write_file", callID: "call_w",
+                        input: ["path": "/tmp/out.txt", "content": "hello"],
+                        status: "completed", output: "ok", error: nil),
                      timeCreated: 1100),
         ])
 
@@ -649,16 +649,18 @@ final class OpenCodeProviderTests: XCTestCase {
         let sessionId: String
         var type: String = "text"
         var text: String? = nil
-        var toolInvocation: TestToolInvocation? = nil
+        var toolPart: TestToolPart? = nil
         let timeCreated: Int64
     }
 
-    private struct TestToolInvocation {
+    /// V2 tool part: flat structure with callID, tool, state.status
+    private struct TestToolPart {
         let toolName: String
-        let toolCallId: String
-        let args: [String: Any]
-        let state: String
-        let result: String?
+        let callID: String
+        let input: [String: Any]
+        let status: String           // pending, running, completed, error
+        let output: String?          // for completed
+        let error: String?           // for error
     }
 
     private struct TestWorkspace {
@@ -770,17 +772,24 @@ final class OpenCodeProviderTests: XCTestCase {
             if let text = p.text {
                 data["text"] = text
             }
-            if let inv = p.toolInvocation {
-                var invDict: [String: Any] = [
-                    "toolName": inv.toolName,
-                    "toolCallId": inv.toolCallId,
-                    "state": inv.state,
-                    "args": inv.args,
-                ]
-                if let result = inv.result {
-                    invDict["result"] = result
+            if let tp = p.toolPart {
+                data["callID"] = tp.callID
+                data["tool"] = tp.toolName
+                var stateDict: [String: Any] = ["status": tp.status, "input": tp.input]
+                if tp.status == "completed", let output = tp.output {
+                    stateDict["output"] = output
+                    stateDict["title"] = tp.toolName
+                    stateDict["metadata"] = [String: Any]()
+                    stateDict["time"] = ["start": p.timeCreated, "end": p.timeCreated]
+                } else if tp.status == "error", let error = tp.error {
+                    stateDict["error"] = error
+                    stateDict["time"] = ["start": p.timeCreated, "end": p.timeCreated]
+                } else if tp.status == "running" {
+                    stateDict["time"] = ["start": p.timeCreated]
+                } else if tp.status == "pending" {
+                    stateDict["raw"] = ""
                 }
-                data["toolInvocation"] = invDict
+                data["state"] = stateDict
             }
             let jsonData = try JSONSerialization.data(withJSONObject: data)
             let jsonStr = String(data: jsonData, encoding: .utf8)!

@@ -250,52 +250,52 @@ public struct OpenCodeProvider {
                     let turnRole: Role = role == "user" ? .user : .assistant
                     turns.append(Turn(role: turnRole, content: [.text(text)], timestamp: partTimestamp))
 
-                case "tool-invocation":
-                    guard let invocation = partJson["toolInvocation"] as? [String: Any],
-                          let toolName = invocation["toolName"] as? String,
-                          let toolCallId = invocation["toolCallId"] as? String else { continue }
+                case "tool":
+                    // V2 format: flat structure with callID, tool, state.status
+                    guard let toolName = partJson["tool"] as? String,
+                          let callId = partJson["callID"] as? String,
+                          let stateDict = partJson["state"] as? [String: Any],
+                          let status = stateDict["status"] as? String else { continue }
 
-                    let state = invocation["state"] as? String ?? "call"
-
-                    // Build input from args
+                    // Build input JSON from state.input
                     var inputJSON: String?
-                    if let args = invocation["args"] {
-                        if let argsData = try? JSONSerialization.data(withJSONObject: args),
-                           let argsStr = String(data: argsData, encoding: .utf8) {
-                            inputJSON = argsStr
+                    if let input = stateDict["input"] {
+                        if let inputData = try? JSONSerialization.data(withJSONObject: input),
+                           let inputStr = String(data: inputData, encoding: .utf8) {
+                            inputJSON = inputStr
                         }
                     }
 
-                    // Always emit the tool use turn
                     turns.append(Turn(
                         role: .assistant,
-                        content: [.toolUse(ToolUse(name: toolName, id: toolCallId, input: inputJSON))],
+                        content: [.toolUse(ToolUse(name: toolName, id: callId, input: inputJSON))],
                         timestamp: partTimestamp
                     ))
 
-                    // Emit tool result if state is "result" or "error"
-                    if state == "result" || state == "error" {
+                    // Emit tool result for completed/error states
+                    if status == "completed" {
                         let output: String
-                        if let result = invocation["result"] as? String {
-                            output = String(result.prefix(5000))
-                        } else if let result = invocation["result"] {
-                            if let resultData = try? JSONSerialization.data(withJSONObject: result),
-                               let resultStr = String(data: resultData, encoding: .utf8) {
-                                output = String(resultStr.prefix(5000))
-                            } else {
-                                output = ""
-                            }
+                        if let out = stateDict["output"] as? String {
+                            output = String(out.prefix(5000))
                         } else {
-                            output = state == "error" ? "Error" : ""
+                            output = ""
                         }
                         turns.append(Turn(
                             role: .tool,
-                            content: [.toolResult(ToolResult(toolUseId: toolCallId, output: output))],
+                            content: [.toolResult(ToolResult(toolUseId: callId, output: output))],
+                            timestamp: partTimestamp
+                        ))
+                    } else if status == "error" {
+                        let errMsg = (stateDict["error"] as? String) ?? "Error"
+                        turns.append(Turn(
+                            role: .tool,
+                            content: [.toolResult(ToolResult(toolUseId: callId, output: String(errMsg.prefix(5000))))],
                             timestamp: partTimestamp
                         ))
                     }
 
-                case "reasoning", "step-start", "step-finish", "file", "source-url":
+                case "reasoning", "step-start", "step-finish", "file", "source-url",
+                     "snapshot", "patch", "agent", "compaction", "subtask", "retry":
                     // Skip non-content parts
                     continue
 
