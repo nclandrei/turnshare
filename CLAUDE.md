@@ -8,13 +8,14 @@ macOS menu bar app for sharing AI coding sessions via GitHub Gists. Supports Cla
 # Build
 cd apps/macos && swift build
 
-# Run tests (122 tests across 5 test targets)
+# Run tests (157 tests across 6 test targets)
 cd apps/macos && swift test
 
 # Run specific test target
 cd apps/macos && swift test --filter SessionCoreTests
 cd apps/macos && swift test --filter ProviderClaudeTests
 cd apps/macos && swift test --filter ProviderCodexTests
+cd apps/macos && swift test --filter ProviderOpenCodeTests
 cd apps/macos && swift test --filter PublisherGistTests
 cd apps/macos && swift test --filter TurnshareTests
 ```
@@ -26,12 +27,15 @@ apps/macos/                    # Swift Package (macOS 14+, SPM 5.9)
   Sources/
     SessionCore/               # Normalized session model (Session, Turn, Agent)
     ProviderClaude/            # Reads Claude Code JSONL → Session
+    ProviderCodex/             # Reads Codex JSONL → Session
+    ProviderOpenCode/          # Reads OpenCode SQLite → Session
     PublisherGist/             # Publishes Session to GitHub Gist
     Turnshare/                 # Main app (menu bar, floating panel, hotkey)
   Tests/
     SessionCoreTests/          # Model encode/decode tests
     ProviderClaudeTests/       # Claude JSONL parsing tests
     ProviderCodexTests/        # Codex JSONL parsing tests
+    ProviderOpenCodeTests/     # OpenCode SQLite parsing tests
     PublisherGistTests/        # Gist payload structure tests
     TurnshareTests/            # AppState logic, preview, hotkey config tests
 
@@ -64,6 +68,13 @@ Version 1 schema at `schema/session.schema.json`. Key types:
 - Agents: `claude-code`, `codex`, `opencode`
 - Roles: `user`, `assistant`, `tool`
 - Content blocks: `text`, `tool_use`, `tool_result`
+
+## Distribution
+
+- Signed and notarized via CI (Developer ID Application certificate)
+- Distributed via Homebrew: `brew install --cask nclandrei/tap/turnshare`
+- Release workflow: CI pass on main → build → codesign → notarize → staple → GitHub release → update Homebrew tap
+- Signing secrets stored in GitHub Actions (APPLE_CERTIFICATE_P12, APPLE_TEAM_ID, etc.)
 
 ## GitHub Auth
 
