@@ -3,6 +3,7 @@ import AppKit
 import SessionCore
 import ProviderClaude
 import ProviderCodex
+import ProviderOpenCode
 import PublisherGist
 
 @MainActor
@@ -59,6 +60,7 @@ final class AppState: ObservableObject {
 
     private let claudeProvider = ClaudeProvider()
     private let codexProvider = CodexProvider()
+    private let openCodeProvider = OpenCodeProvider()
     private let auth: GitHubAuth
     private let publisher: GistPublisher
 
@@ -85,6 +87,7 @@ final class AppState: ObservableObject {
     private func scanSession(at file: URL) -> SessionSummary? {
         if let summary = claudeProvider.scanSession(at: file) { return summary }
         if let summary = codexProvider.scanSession(at: file) { return summary }
+        if let summary = openCodeProvider.scanSession(at: file) { return summary }
         return nil
     }
 
@@ -93,7 +96,9 @@ final class AppState: ObservableObject {
         switch summary.agent {
         case .codex:
             return try codexProvider.parseSession(at: summary.filePath)
-        case .claudeCode, .opencode:
+        case .opencode:
+            return try openCodeProvider.parseSession(at: summary.filePath)
+        case .claudeCode:
             return try claudeProvider.parseSession(at: summary.filePath)
         }
     }
@@ -127,7 +132,11 @@ final class AppState: ObservableObject {
         do {
             let claudeFiles = try claudeProvider.listSessionFilesWithDates()
             let codexFiles = try codexProvider.listSessionFilesWithDates()
-            allSessionFiles = Self.mergeSortedDescending(claudeFiles, codexFiles).map(\.url)
+            let openCodeFiles = try openCodeProvider.listSessionFilesWithDates()
+            allSessionFiles = Self.mergeSortedDescending(
+                Self.mergeSortedDescending(claudeFiles, codexFiles),
+                openCodeFiles
+            ).map(\.url)
             loadedFileCount = 0
             sessions = []
             loadNextPage()
