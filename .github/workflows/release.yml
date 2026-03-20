@@ -123,8 +123,8 @@ jobs:
           IDENTITY=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -1 | sed 's/.*"\(.*\)".*/\1/')
           ENTITLEMENTS="Turnshare.entitlements"
 
-          # Sign nested bundles first
-          find Turnshare.app/Contents -name "*.bundle" -o -name "*.dylib" -o -name "*.framework" | while read item; do
+          # Sign nested dylibs/frameworks (skip SPM resource bundles)
+          find Turnshare.app/Contents -name "*.dylib" -o -name "*.framework" | while read item; do
             codesign --force --sign "$IDENTITY" --options runtime --timestamp "$item"
           done
 
