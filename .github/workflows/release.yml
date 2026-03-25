@@ -169,19 +169,25 @@ jobs:
             --team-id "$APPLE_TEAM_ID" \
             --wait
 
-      - name: Staple
+      - name: Wait for ticket propagation
         run: |
-          for i in $(seq 1 10); do
+          echo "Waiting 60s for Apple notarization ticket to propagate..."
+          sleep 60
+
+      - name: Staple
+        continue-on-error: true
+        run: |
+          for i in $(seq 1 5); do
             if xcrun stapler staple Turnshare.app; then
               exit 0
             fi
-            echo "Staple attempt $i failed, waiting 30s for ticket propagation..."
+            echo "Staple attempt $i failed, waiting 30s..."
             sleep 30
           done
-          echo "Stapling failed after 10 attempts"
+          echo "::warning::Stapling failed — app is still notarized and will work, Gatekeeper checks online instead"
           exit 1
 
-      - name: Re-package with stapled ticket
+      - name: Re-package
         run: |
           rm Turnshare.zip
           ditto -c -k --sequesterRsrc --keepParent Turnshare.app Turnshare.zip
