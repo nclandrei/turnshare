@@ -3,6 +3,7 @@ import HotKey
 
 struct SettingsView: View {
     @EnvironmentObject var appState: AppState
+    @EnvironmentObject var updaterController: UpdaterController
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -138,6 +139,26 @@ struct SettingsView: View {
                             .buttonStyle(.borderedProminent)
                             .controlSize(.regular)
                     }
+                }
+            }
+
+            Divider()
+
+            // Updates
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Updates")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+
+                HStack {
+                    Text("Automatically checks for updates")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Button("Check for Updates") {
+                        updaterController.checkForUpdates()
+                    }
+                    .disabled(!updaterController.canCheckForUpdates)
                 }
             }
         }

@@ -8,12 +8,13 @@ let package = Package(
         .executable(name: "Turnshare", targets: ["Turnshare"])
     ],
     dependencies: [
-        .package(url: "https://github.com/soffes/HotKey", from: "0.2.0")
+        .package(url: "https://github.com/soffes/HotKey", from: "0.2.0"),
+        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.0.0"),
     ],
     targets: [
         .executableTarget(
             name: "Turnshare",
-            dependencies: ["SessionCore", "ProviderClaude", "ProviderCodex", "ProviderOpenCode", "PublisherGist", "HotKey"]
+            dependencies: ["SessionCore", "ProviderClaude", "ProviderCodex", "ProviderOpenCode", "PublisherGist", "HotKey", "Sparkle"]
         ),
         .target(name: "SessionCore"),
         .target(name: "ProviderClaude", dependencies: ["SessionCore"]),

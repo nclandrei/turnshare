@@ -110,9 +110,22 @@ jobs:
             <true/>
             <key>NSHighResolutionCapable</key>
             <true/>
+            <key>SUFeedURL</key>
+            <string>https://nclandrei.github.io/turnshare/appcast.xml</string>
+            <key>SUPublicEDKey</key>
+            <string>${{ secrets.SPARKLE_EDDSA_PUBLIC_KEY }}</string>
+            <key>SUEnableAutomaticChecks</key>
+            <true/>
           </dict>
           </plist>
           PLIST
+
+      - name: Embed Sparkle framework
+        run: |
+          BIN_PATH=$(swift build -c release --show-bin-path)
+          # SPM copies Sparkle.framework (with XPC services) into the build output
+          mkdir -p Turnshare.app/Contents/Frameworks
+          cp -R "$BIN_PATH/Sparkle.framework" Turnshare.app/Contents/Frameworks/
 
       - name: Codesign
         env:
@@ -120,6 +133,11 @@ jobs:
         run: |
           IDENTITY=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -1 | sed 's/.*"\(.*\)".*/\1/')
           ENTITLEMENTS="Turnshare.entitlements"
+
+          # Sign Sparkle XPC services first
+          find Turnshare.app/Contents/XPCServices -name "*.xpc" 2>/dev/null | while read item; do
+            codesign --force --sign "$IDENTITY" --options runtime --timestamp "$item"
+          done
 
           # Sign nested dylibs/frameworks (skip SPM resource bundles)
           find Turnshare.app/Contents -name "*.dylib" -o -name "*.framework" | while read item; do
@@ -162,6 +180,18 @@ jobs:
       - name: Compute SHA256
         id: sha
         run: echo "sha256=$(shasum -a 256 Turnshare.zip | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Generate Sparkle signature
+        id: sparkle
+        env:
+          SPARKLE_EDDSA_PRIVATE_KEY: ${{ secrets.SPARKLE_EDDSA_PRIVATE_KEY }}
+        run: |
+          # sign_update is in the Sparkle artifacts directory
+          SIGN_UPDATE=$(find .build/artifacts -name "sign_update" -not -path "*/old_dsa*" -type f | head -1)
+          SIGNATURE=$("$SIGN_UPDATE" Turnshare.zip --ed-key-file <(echo "$SPARKLE_EDDSA_PRIVATE_KEY"))
+          # sign_update outputs: sparkle:edSignature="..." length="..."
+          ED_SIGNATURE=$(echo "$SIGNATURE" | grep -o 'sparkle:edSignature="[^"]*"' | sed 's/sparkle:edSignature="//;s/"//')
+          echo "signature=$ED_SIGNATURE" >> "$GITHUB_OUTPUT"
 
       - name: Create release
         env:
@@ -211,6 +241,45 @@ jobs:
           git add Casks/turnshare.rb
           git commit -m "Update turnshare to ${TAG}"
           git push
+
+      - name: Update appcast.xml
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${{ steps.version.outputs.tag }}"
+          VERSION="${{ steps.version.outputs.tag }}"
+          SIZE=$(stat -f%z Turnshare.zip)
+          URL="https://github.com/nclandrei/turnshare/releases/download/${TAG}/Turnshare.zip"
+          SIGNATURE="${{ steps.sparkle.outputs.signature }}"
+          DATE=$(date -u +"%a, %d %b %Y %H:%M:%S %z")
+
+          python3 - "$GITHUB_WORKSPACE/docs/appcast.xml" "$TAG" "$VERSION" "$DATE" "$URL" "$SIGNATURE" "$SIZE" << 'PYEOF'
+          import sys
+          path, tag, version, date, url, sig, size = sys.argv[1:]
+          item = f"""    <item>
+              <title>Turnshare {tag}</title>
+              <pubDate>{date}</pubDate>
+              <sparkle:version>{version}</sparkle:version>
+              <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
+              <enclosure url="{url}"
+                         type="application/octet-stream"
+                         sparkle:edSignature="{sig}"
+                         length="{size}" />
+            </item>"""
+          with open(path) as f:
+              xml = f.read()
+          xml = xml.replace("  </channel>", item + "\n  </channel>")
+          with open(path, "w") as f:
+              f.write(xml)
+          PYEOF
+
+          # Commit and push the updated appcast
+          cd "$GITHUB_WORKSPACE"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/appcast.xml
+          git commit -m "Update appcast.xml for ${TAG}"
+          git push origin HEAD:main
 
       - name: Cleanup keychain
         if: always()

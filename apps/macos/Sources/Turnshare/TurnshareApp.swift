@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import HotKey
+import Sparkle
 
 @main
 struct TurnshareApp: App {
@@ -23,6 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var hudDismissTask: Task<Void, Never>?
     private var hotKey: HotKey?
     private let appState = AppState()
+    let updaterController = UpdaterController()
     private let hotKeyConfig = HotKeyConfig.shared
     private var clickOutsideMonitor: Any?
 
@@ -49,7 +51,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Create floating panel
         panel = FloatingPanel(
-            rootView: SessionListView().environmentObject(appState)
+            rootView: SessionListView()
+                .environmentObject(appState)
+                .environmentObject(updaterController)
         )
 
         // Wire Cmd+1-9 from panel to AppState
