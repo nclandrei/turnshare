@@ -171,14 +171,14 @@ jobs:
 
       - name: Staple
         run: |
-          for i in 1 2 3 4 5; do
+          for i in $(seq 1 10); do
             if xcrun stapler staple Turnshare.app; then
               exit 0
             fi
-            echo "Staple attempt $i failed, waiting 15s for ticket propagation..."
-            sleep 15
+            echo "Staple attempt $i failed, waiting 30s for ticket propagation..."
+            sleep 30
           done
-          echo "Stapling failed after 5 attempts"
+          echo "Stapling failed after 10 attempts"
           exit 1
 
       - name: Re-package with stapled ticket
