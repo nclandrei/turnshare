@@ -81,6 +81,7 @@ jobs:
           BIN_PATH=$(swift build -c release --show-bin-path)
           mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
           cp "$BIN_PATH/Turnshare" "$APP/Contents/MacOS/"
+          install_name_tool -add_rpath @loader_path/../Frameworks "$APP/Contents/MacOS/Turnshare"
           cp Turnshare.icns "$APP/Contents/Resources/AppIcon.icns"
           cp Sources/Turnshare/Resources/menubar-icon*.png "$APP/Contents/Resources/"
           cat > "$APP/Contents/Info.plist" << 'PLIST'
