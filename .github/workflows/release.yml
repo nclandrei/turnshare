@@ -28,7 +28,9 @@ jobs:
 
       - name: Set version
         id: version
-        run: echo "tag=$(date -u +'%Y%m%d.%H%M%S')" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "tag=$(date -u +'%Y%m%d.%H%M%S')" >> "$GITHUB_OUTPUT"
+          echo "display=$(cat ../../VERSION | tr -d '[:space:]')" >> "$GITHUB_OUTPUT"
 
       - name: Import signing certificate
         env:
@@ -98,7 +100,7 @@ jobs:
             <key>CFBundleVersion</key>
             <string>${{ steps.version.outputs.tag }}</string>
             <key>CFBundleShortVersionString</key>
-            <string>0.1.0</string>
+            <string>${{ steps.version.outputs.display }}</string>
             <key>CFBundleExecutable</key>
             <string>Turnshare</string>
             <key>CFBundlePackageType</key>
@@ -276,7 +278,7 @@ jobs:
               <title>Turnshare {tag}</title>
               <pubDate>{date}</pubDate>
               <sparkle:version>{version}</sparkle:version>
-              <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
+              <sparkle:shortVersionString>${{ steps.version.outputs.display }}</sparkle:shortVersionString>
               <enclosure url="{url}"
                          type="application/octet-stream"
                          sparkle:edSignature="{sig}"
