@@ -11,7 +11,7 @@
 
 <p align="center">
   <a href="https://github.com/nclandrei/turnshare/releases/latest">Download</a> &middot;
-  <a href="https://nclandrei.github.io/turnshare">Web Viewer</a>
+  <a href="https://turnshare.nicolaeandrei.com">Web Viewer</a>
 </p>
 
 ## How It Works
@@ -19,7 +19,7 @@
 1. **Activate** the panel with a global hotkey (default `⌃⇧S`)
 2. **Browse** your Claude Code and Codex sessions — searchable, sorted by recency
 3. **Publish** with a modifier+number shortcut (e.g. `⌘1`) — the session is uploaded as a GitHub Gist and a shareable URL is copied to your clipboard
-4. **Share** the link — anyone can view the rendered session in the [web viewer](https://nclandrei.github.io/turnshare)
+4. **Share** the link — anyone can view the rendered session in the [web viewer](https://turnshare.nicolaeandrei.com)
 
 Sessions are read directly from `~/.claude/projects/` and `~/.codex/` — no configuration needed.
 

@@ -2,7 +2,7 @@
 <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
   <channel>
     <title>Turnshare</title>
-    <link>https://nclandrei.github.io/turnshare/appcast.xml</link>
+    <link>https://turnshare.nicolaeandrei.com/appcast.xml</link>
     <description>Turnshare updates</description>
     <language>en</language>
     <item>

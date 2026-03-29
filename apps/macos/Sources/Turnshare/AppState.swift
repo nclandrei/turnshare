@@ -105,8 +105,8 @@ final class AppState: ObservableObject {
 
     static let githubClientId = "Ov23liMEqPKk3wK68g1w"
 
-    // Base URL for the Turnshare web renderer (GitHub Pages)
-    static let rendererBaseURL = "https://nclandrei.github.io/turnshare"
+    // Base URL for the Turnshare web renderer
+    static let rendererBaseURL = "https://turnshare.nicolaeandrei.com"
 
     init() {
         self.auth = GitHubAuth(clientId: Self.githubClientId)

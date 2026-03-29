@@ -114,7 +114,7 @@ jobs:
             <key>NSHighResolutionCapable</key>
             <true/>
             <key>SUFeedURL</key>
-            <string>https://nclandrei.github.io/turnshare/appcast.xml</string>
+            <string>https://turnshare.nicolaeandrei.com/appcast.xml</string>
             <key>SUPublicEDKey</key>
             <string>${{ secrets.SPARKLE_EDDSA_PUBLIC_KEY }}</string>
             <key>SUEnableAutomaticChecks</key>
