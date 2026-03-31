@@ -141,18 +141,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func showPanel() {
-        // Position centered on the screen that contains the mouse cursor
-        let mouseLocation = NSEvent.mouseLocation
-        let screen = NSScreen.screens.first(where: { NSMouseInRect(mouseLocation, $0.frame, false) })
-            ?? NSScreen.main
-            ?? NSScreen.screens.first!
-
-        let screenFrame = screen.visibleFrame
+        // Position below the menu bar icon
         let panelSize = panel.frame.size
-        let x = screenFrame.midX - panelSize.width / 2
-        let y = screenFrame.midY - panelSize.height / 2
 
-        panel.setFrameOrigin(NSPoint(x: x, y: y))
+        let x: CGFloat
+        let y: CGFloat
+
+        if let button = statusItem.button,
+           let buttonWindow = button.window {
+            let buttonFrame = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
+            x = buttonFrame.midX - panelSize.width / 2
+            y = buttonFrame.minY - panelSize.height - 4
+        } else {
+            // Fallback: center on screen
+            let screen = NSScreen.main ?? NSScreen.screens.first!
+            let screenFrame = screen.visibleFrame
+            x = screenFrame.midX - panelSize.width / 2
+            y = screenFrame.midY - panelSize.height / 2
+        }
+
+        // Clamp to screen bounds so the panel stays fully visible
+        let screen = NSScreen.screens.first(where: {
+            NSMouseInRect(NSPoint(x: x + panelSize.width / 2, y: y + panelSize.height / 2), $0.frame, false)
+        }) ?? NSScreen.main ?? NSScreen.screens.first!
+        let screenFrame = screen.visibleFrame
+        let clampedX = max(screenFrame.minX, min(x, screenFrame.maxX - panelSize.width))
+        let clampedY = max(screenFrame.minY, min(y, screenFrame.maxY - panelSize.height))
+
+        panel.setFrameOrigin(NSPoint(x: clampedX, y: clampedY))
         panel.makeKeyAndOrderFront(nil)
 
         // Monitor for clicks outside both panels to dismiss
