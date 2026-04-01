@@ -137,13 +137,9 @@ jobs:
           IDENTITY=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -1 | sed 's/.*"\(.*\)".*/\1/')
           ENTITLEMENTS="Turnshare.entitlements"
 
-          # Sign Sparkle XPC services first
-          find Turnshare.app/Contents/XPCServices -name "*.xpc" 2>/dev/null | while read item; do
-            codesign --force --sign "$IDENTITY" --options runtime --timestamp "$item"
-          done
-
-          # Sign nested dylibs/frameworks (skip SPM resource bundles)
-          find Turnshare.app/Contents -name "*.dylib" -o -name "*.framework" | while read item; do
+          # Sign all nested code (XPC services, dylibs, frameworks) deepest-first
+          find Turnshare.app/Contents \( -name "*.xpc" -o -name "*.dylib" -o -name "*.framework" \) -print0 | \
+            sort -rz | while IFS= read -r -d '' item; do
             codesign --force --sign "$IDENTITY" --options runtime --timestamp "$item"
           done
 
@@ -152,6 +148,7 @@ jobs:
             --options runtime \
             --entitlements "$ENTITLEMENTS" \
             --timestamp \
+            --deep \
             Turnshare.app
 
       - name: Verify codesign
@@ -166,11 +163,25 @@ jobs:
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          xcrun notarytool submit Turnshare.zip \
+          RESULT=$(xcrun notarytool submit Turnshare.zip \
             --apple-id "$APPLE_ID" \
             --password "$APPLE_ID_PASSWORD" \
             --team-id "$APPLE_TEAM_ID" \
-            --wait
+            --wait 2>&1)
+          echo "$RESULT"
+
+          ID=$(echo "$RESULT" | grep "id:" | head -1 | awk '{print $2}')
+          STATUS=$(echo "$RESULT" | grep "status:" | tail -1 | awk '{print $2}')
+
+          if [ "$STATUS" != "Accepted" ]; then
+            echo "Notarization failed with status: $STATUS"
+            echo "Fetching notarization log..."
+            xcrun notarytool log "$ID" \
+              --apple-id "$APPLE_ID" \
+              --password "$APPLE_ID_PASSWORD" \
+              --team-id "$APPLE_TEAM_ID" || true
+            exit 1
+          fi
 
       - name: Wait for ticket propagation
         run: |
