@@ -1,6 +1,7 @@
 name: Release
 
 on:
+  workflow_dispatch:
   workflow_run:
     workflows: ["CI"]
     types: [completed]
@@ -15,7 +16,7 @@ permissions:
 
 jobs:
   release:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: macos-15
     defaults:
       run:
@@ -24,13 +25,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Set version
         id: version
         run: |
           echo "tag=$(date -u +'%Y%m%d.%H%M%S')" >> "$GITHUB_OUTPUT"
-          echo "display=$(cat ../../VERSION | tr -d '[:space:]')" >> "$GITHUB_OUTPUT"
+          CURRENT=$(cat ../../VERSION | tr -d '[:space:]')
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+          PATCH=$((PATCH + 1))
+          NEXT="${MAJOR}.${MINOR}.${PATCH}"
+          echo "$NEXT" > ../../VERSION
+          echo "display=$NEXT" >> "$GITHUB_OUTPUT"
 
       - name: Import signing certificate
         env:
@@ -126,7 +132,6 @@ jobs:
       - name: Embed Sparkle framework
         run: |
           BIN_PATH=$(swift build -c release --show-bin-path)
-          # SPM copies Sparkle.framework (with XPC services) into the build output
           mkdir -p Turnshare.app/Contents/Frameworks
           cp -R "$BIN_PATH/Sparkle.framework" Turnshare.app/Contents/Frameworks/
 
@@ -210,16 +215,24 @@ jobs:
         id: sha
         run: echo "sha256=$(shasum -a 256 Turnshare.zip | awk '{print $1}')" >> "$GITHUB_OUTPUT"
 
+      - name: Compute file size
+        id: filesize
+        run: echo "size=$(stat -f%z Turnshare.zip)" >> "$GITHUB_OUTPUT"
+
       - name: Generate Sparkle signature
         id: sparkle
         env:
           SPARKLE_EDDSA_PRIVATE_KEY: ${{ secrets.SPARKLE_EDDSA_PRIVATE_KEY }}
         run: |
-          # sign_update is in the Sparkle artifacts directory
-          SIGN_UPDATE=$(find .build/artifacts -name "sign_update" -not -path "*/old_dsa*" -type f | head -1)
-          SIGNATURE=$("$SIGN_UPDATE" Turnshare.zip --ed-key-file <(echo "$SPARKLE_EDDSA_PRIVATE_KEY"))
-          # sign_update outputs: sparkle:edSignature="..." length="..."
-          ED_SIGNATURE=$(echo "$SIGNATURE" | grep -o 'sparkle:edSignature="[^"]*"' | sed 's/sparkle:edSignature="//;s/"//')
+          SPARKLE_VERSION="2.6.0"
+          curl -sL "https://github.com/sparkle-project/Sparkle/releases/download/${SPARKLE_VERSION}/Sparkle-${SPARKLE_VERSION}.tar.xz" -o "$RUNNER_TEMP/sparkle.tar.xz"
+          mkdir -p "$RUNNER_TEMP/sparkle"
+          tar -xf "$RUNNER_TEMP/sparkle.tar.xz" -C "$RUNNER_TEMP/sparkle"
+          KEY_FILE="$RUNNER_TEMP/sparkle_ed_key"
+          echo "$SPARKLE_EDDSA_PRIVATE_KEY" > "$KEY_FILE"
+          SIGN_OUTPUT=$("$RUNNER_TEMP/sparkle/bin/sign_update" Turnshare.zip --ed-key-file "$KEY_FILE")
+          rm -f "$KEY_FILE"
+          ED_SIGNATURE=$(echo "$SIGN_OUTPUT" | sed -n 's/.*sparkle:edSignature="\([^"]*\)".*/\1/p')
           echo "signature=$ED_SIGNATURE" >> "$GITHUB_OUTPUT"
 
       - name: Create release
@@ -227,11 +240,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="v${{ steps.version.outputs.tag }}"
-          SHORT_SHA=$(echo "${{ github.event.workflow_run.head_sha }}" | cut -c1-7)
+          FULL_SHA="${{ github.event.workflow_run.head_sha || github.sha }}"
+          SHORT_SHA=$(echo "$FULL_SHA" | cut -c1-7)
           gh release create "$TAG" \
             --title "Turnshare ${TAG}" \
             --notes "Automated build from main (${SHORT_SHA}). Signed and notarized." \
-            --target "${{ github.event.workflow_run.head_sha }}" \
+            --target "${FULL_SHA}" \
             Turnshare.zip
 
       - name: Update Homebrew tap
@@ -244,25 +258,26 @@ jobs:
 
           git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/nclandrei/homebrew-tap.git" "$RUNNER_TEMP/homebrew-tap"
 
-          cat > "$RUNNER_TEMP/homebrew-tap/Casks/turnshare.rb" << CASK
-          cask "turnshare" do
-            version "${TAG#v}"
-            sha256 "${SHA256}"
-
-            url "${URL}"
-            name "Turnshare"
-            desc "macOS menu bar app for sharing AI coding sessions via GitHub Gists"
-            homepage "https://github.com/nclandrei/turnshare"
-
-            depends_on macos: ">= :sonoma"
-
-            app "Turnshare.app"
-
-            zap trash: [
-              "~/Library/Preferences/com.nclandrei.turnshare.plist",
-            ]
-          end
-          CASK
+          CASK_FILE="$RUNNER_TEMP/homebrew-tap/Casks/turnshare.rb"
+          {
+            echo "cask \"turnshare\" do"
+            echo "  version \"${TAG#v}\""
+            echo "  sha256 \"${SHA256}\""
+            echo ""
+            echo "  url \"${URL}\""
+            echo "  name \"Turnshare\""
+            echo "  desc \"macOS menu bar app for sharing AI coding sessions via GitHub Gists\""
+            echo "  homepage \"https://github.com/nclandrei/turnshare\""
+            echo ""
+            echo "  depends_on macos: \">= :sonoma\""
+            echo ""
+            echo "  app \"Turnshare.app\""
+            echo ""
+            echo "  zap trash: ["
+            echo "    \"~/Library/Preferences/com.nclandrei.turnshare.plist\","
+            echo "  ]"
+            echo "end"
+          } > "$CASK_FILE"
 
           cd "$RUNNER_TEMP/homebrew-tap"
           git config user.name "github-actions[bot]"
@@ -277,36 +292,37 @@ jobs:
         run: |
           TAG="v${{ steps.version.outputs.tag }}"
           VERSION="${{ steps.version.outputs.tag }}"
-          SIZE=$(stat -f%z Turnshare.zip)
+          SIZE="${{ steps.filesize.outputs.size }}"
           URL="https://github.com/nclandrei/turnshare/releases/download/${TAG}/Turnshare.zip"
           SIGNATURE="${{ steps.sparkle.outputs.signature }}"
-          DATE=$(date -u +"%a, %d %b %Y %H:%M:%S %z")
+          PUB_DATE=$(date -u +"%a, %d %b %Y %H:%M:%S %z")
 
-          python3 - "$GITHUB_WORKSPACE/docs/appcast.xml" "$TAG" "$VERSION" "$DATE" "$URL" "$SIGNATURE" "$SIZE" << 'PYEOF'
+          python3 -c "
           import sys
-          path, tag, version, date, url, sig, size = sys.argv[1:]
-          item = f"""    <item>
-              <title>Turnshare {tag}</title>
-              <pubDate>{date}</pubDate>
-              <sparkle:version>{version}</sparkle:version>
+          item = '''    <item>
+              <title>Turnshare $TAG</title>
+              <pubDate>$PUB_DATE</pubDate>
+              <sparkle:version>$VERSION</sparkle:version>
               <sparkle:shortVersionString>${{ steps.version.outputs.display }}</sparkle:shortVersionString>
-              <enclosure url="{url}"
-                         type="application/octet-stream"
-                         sparkle:edSignature="{sig}"
-                         length="{size}" />
-            </item>"""
-          with open(path) as f:
-              xml = f.read()
-          xml = xml.replace("  </channel>", item + "\n  </channel>")
-          with open(path, "w") as f:
-              f.write(xml)
-          PYEOF
+              <enclosure
+                url=\"$URL\"
+                length=\"$SIZE\"
+                type=\"application/octet-stream\"
+                sparkle:edSignature=\"$SIGNATURE\"
+              />
+            </item>
+          '''
+          with open('$GITHUB_WORKSPACE/docs/appcast.xml', 'r') as f:
+              content = f.read()
+          content = content.replace('</channel>', item + '  </channel>')
+          with open('$GITHUB_WORKSPACE/docs/appcast.xml', 'w') as f:
+              f.write(content)
+          "
 
-          # Commit and push the updated appcast
           cd "$GITHUB_WORKSPACE"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/appcast.xml
+          git add docs/appcast.xml VERSION
           git commit -m "Update appcast.xml for ${TAG}"
           git push origin HEAD:main
 
