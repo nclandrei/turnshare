@@ -45,6 +45,7 @@ final class AppState: ObservableObject {
     var isHoveringPreviewPanel = false
     private var previewCache: [String: [Turn]] = [:]
     private var clearPreviewTask: Task<Void, Never>?
+    private var refreshTask: Task<Void, Never>?
 
     /// Called after a publish is initiated (panel should close).
     var onPublishInitiated: (() -> Void)?
@@ -197,6 +198,41 @@ final class AppState: ObservableObject {
         sessions.append(contentsOf: newSummaries)
         loadedFileCount = end
         hasMoreSessions = end < allSessionFiles.count
+    }
+
+    // MARK: - Auto-Refresh
+
+    func startAutoRefresh() {
+        stopAutoRefresh()
+        refreshTask = Task { @MainActor in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 30_000_000_000) // 30s
+                guard !Task.isCancelled else { break }
+                refreshIfChanged()
+            }
+        }
+    }
+
+    func stopAutoRefresh() {
+        refreshTask?.cancel()
+        refreshTask = nil
+    }
+
+    private func refreshIfChanged() {
+        do {
+            let claudeFiles = try claudeProvider.listSessionFilesWithDates()
+            let codexFiles = try codexProvider.listSessionFilesWithDates()
+            let openCodeFiles = try openCodeProvider.listSessionFilesWithDates()
+            let newFiles = Self.mergeSortedDescending(
+                Self.mergeSortedDescending(claudeFiles, codexFiles),
+                openCodeFiles
+            ).map(\.url)
+
+            guard newFiles != allSessionFiles else { return }
+            loadSessions()
+        } catch {
+            // Silently ignore — will retry on next tick
+        }
     }
 
     // MARK: - Auth

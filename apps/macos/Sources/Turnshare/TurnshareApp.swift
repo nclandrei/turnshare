@@ -170,6 +170,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         panel.setFrameOrigin(NSPoint(x: clampedX, y: clampedY))
         panel.makeKeyAndOrderFront(nil)
+        appState.startAutoRefresh()
 
         // Monitor for clicks outside both panels to dismiss
         clickOutsideMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
@@ -184,6 +185,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func hidePanel() {
+        appState.stopAutoRefresh()
         panel.orderOut(nil)
         previewPanel.orderOut(nil)
         appState.clearPreviewImmediately()
