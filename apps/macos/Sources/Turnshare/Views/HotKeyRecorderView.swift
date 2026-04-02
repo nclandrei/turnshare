@@ -18,7 +18,7 @@ struct HotKeyRecorderView: View {
         HStack(spacing: 8) {
             Text("Hotkey")
                 .font(.subheadline)
-                .foregroundColor(.secondary)
+                .foregroundColor(Theme.textMuted)
 
             Button(action: { toggleRecording() }) {
                 Text(isRecording ? "Press shortcut…" : displayText)
@@ -26,11 +26,11 @@ struct HotKeyRecorderView: View {
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
                     .frame(minWidth: 120)
-                    .background(isRecording ? Color.accentColor.opacity(0.15) : Color.secondary.opacity(0.1))
+                    .background(isRecording ? Theme.accentBlue.opacity(0.15) : Theme.bgElevated)
                     .cornerRadius(6)
                     .overlay(
                         RoundedRectangle(cornerRadius: 6)
-                            .stroke(isRecording ? Color.accentColor : Color.clear, lineWidth: 1.5)
+                            .stroke(isRecording ? Theme.accentBlue : Color.clear, lineWidth: 1.5)
                     )
             }
             .buttonStyle(.plain)

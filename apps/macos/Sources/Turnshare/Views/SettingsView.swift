@@ -34,7 +34,7 @@ struct SettingsView: View {
                 HStack(spacing: 8) {
                     Text("Modifier")
                         .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(Theme.textMuted)
 
                     ModifierPicker(
                         selected: QuickPublishConfig.shared.modifier,
@@ -46,7 +46,7 @@ struct SettingsView: View {
 
                     Text("+ 1–9")
                         .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(Theme.textMuted)
                 }
             }
 
@@ -70,7 +70,7 @@ struct SettingsView: View {
                             .font(.subheadline)
                         Text("Select a session first, then confirm with a Publish button")
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(Theme.textMuted)
                     }
                 }
                 .toggleStyle(.switch)
@@ -88,28 +88,28 @@ struct SettingsView: View {
                 if appState.isAuthenticated {
                     HStack {
                         Image(systemName: "person.circle.fill")
-                            .foregroundColor(.green)
+                            .foregroundColor(Theme.accentGreen)
                         if let username = appState.githubUsername {
                             Text(username)
                                 .font(.subheadline)
-                                .foregroundColor(.secondary)
+                                .foregroundColor(Theme.textMuted)
                         }
                         Spacer()
                         Button("Re-authenticate") { appState.startSignIn() }
                             .font(.subheadline)
                             .buttonStyle(.plain)
-                            .foregroundColor(.accentColor)
+                            .foregroundColor(Theme.accentBlue)
                         Button("Sign Out") { appState.signOut() }
                             .font(.subheadline)
                             .buttonStyle(.plain)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(Theme.textMuted)
                     }
                 } else if appState.isAuthenticating {
                     if let code = appState.authUserCode {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Enter code on GitHub:")
                                 .font(.subheadline)
-                                .foregroundColor(.secondary)
+                                .foregroundColor(Theme.textMuted)
                             Text(code)
                                 .font(.system(.title3, design: .monospaced))
                                 .fontWeight(.bold)
@@ -121,17 +121,17 @@ struct SettingsView: View {
                                 .controlSize(.small)
                             Text("Connecting to GitHub...")
                                 .font(.subheadline)
-                                .foregroundColor(.secondary)
+                                .foregroundColor(Theme.textMuted)
                         }
                     }
                 } else {
                     HStack {
                         if let error = appState.authError {
                             Image(systemName: "exclamationmark.triangle")
-                                .foregroundColor(.red)
+                                .foregroundColor(Theme.accentRed)
                             Text(error)
                                 .font(.subheadline)
-                                .foregroundColor(.red)
+                                .foregroundColor(Theme.accentRed)
                                 .lineLimit(1)
                         }
                         Spacer()
@@ -153,7 +153,7 @@ struct SettingsView: View {
                 HStack {
                     Text("Automatically checks for updates")
                         .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(Theme.textMuted)
                     Spacer()
                     Button("Check for Updates") {
                         updaterController.checkForUpdates()
@@ -164,6 +164,7 @@ struct SettingsView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
+        .background(Theme.bgSurface)
     }
 }
 
@@ -189,8 +190,8 @@ struct ModifierPicker: View {
                         .font(.subheadline)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
-                        .background(selected == mod ? Color.accentColor : Color.secondary.opacity(0.15))
-                        .foregroundColor(selected == mod ? .white : .primary)
+                        .background(selected == mod ? Theme.accentBlue : Theme.bgElevated)
+                        .foregroundColor(selected == mod ? .white : Theme.text)
                 }
                 .buttonStyle(.plain)
             }

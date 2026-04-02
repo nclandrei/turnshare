@@ -11,12 +11,13 @@ struct SessionListView: View {
             // Search bar
             HStack {
                 Image(systemName: "magnifyingglass")
-                    .foregroundColor(.secondary)
+                    .foregroundColor(Theme.textMuted)
                 TextField("Search sessions...", text: $appState.searchText)
                     .textFieldStyle(.plain)
+                    .foregroundColor(Theme.text)
             }
             .padding(10)
-            .background(.ultraThinMaterial)
+            .background(Theme.bgSurface)
 
             Divider()
 
@@ -28,7 +29,7 @@ struct SessionListView: View {
             } else if appState.filteredSessions.isEmpty {
                 Spacer()
                 Text("No sessions found")
-                    .foregroundColor(.secondary)
+                    .foregroundColor(Theme.textMuted)
                 Spacer()
             } else {
                 List {
@@ -57,6 +58,8 @@ struct SessionListView: View {
                     }
                 }
                 .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .background(Theme.bg)
             }
 
             // Confirmation bar
@@ -75,7 +78,7 @@ struct SessionListView: View {
                         .controlSize(.small)
                     Text("Publishing...")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(Theme.textMuted)
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
@@ -83,14 +86,14 @@ struct SessionListView: View {
             } else if let url = appState.lastPublishedURL {
                 HStack {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
+                        .foregroundColor(Theme.accentGreen)
                         .font(.caption)
                     Text("URL copied!")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(Theme.textMuted)
                     Text(url)
                         .font(.caption)
-                        .foregroundColor(.blue)
+                        .foregroundColor(Theme.accentBlue)
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
@@ -100,11 +103,11 @@ struct SessionListView: View {
             } else if let error = appState.publishError {
                 HStack {
                     Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundColor(.red)
+                        .foregroundColor(Theme.accentRed)
                         .font(.caption)
                     Text(error)
                         .font(.caption)
-                        .foregroundColor(.red)
+                        .foregroundColor(Theme.accentRed)
                         .lineLimit(1)
                 }
                 .padding(.horizontal, 10)
@@ -121,6 +124,7 @@ struct SessionListView: View {
             // Footer
             FooterView(showSettings: $showSettings)
         }
+        .background(Theme.bg)
         .onAppear {
             appState.loadSessions()
             appState.restoreAuth()
@@ -139,40 +143,41 @@ struct FooterView: View {
         HStack {
             Button(action: { showSettings.toggle() }) {
                 Image(systemName: "gearshape")
-                    .foregroundColor(showSettings ? .accentColor : .secondary)
+                    .foregroundColor(showSettings ? Theme.accentBlue : Theme.textMuted)
                     .font(.caption)
             }
             .buttonStyle(.plain)
 
             if appState.isAuthenticated, let username = appState.githubUsername {
                 Image(systemName: "person.circle.fill")
-                    .foregroundColor(.green)
+                    .foregroundColor(Theme.accentGreen)
                     .font(.caption)
                 Text(username)
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(Theme.textMuted)
             } else if appState.isAuthenticating {
                 ProgressView()
                     .controlSize(.small)
                 Text("Authenticating...")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(Theme.textMuted)
             } else if !appState.isAuthenticated {
                 Image(systemName: "person.circle")
-                    .foregroundColor(.secondary)
+                    .foregroundColor(Theme.textMuted)
                     .font(.caption)
                 Text("Not signed in")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(Theme.textMuted)
             }
 
             Spacer()
 
             Text("\(appState.filteredSessions.count) sessions")
                 .font(.caption)
-                .foregroundColor(.secondary)
+                .foregroundColor(Theme.textMuted)
         }
         .padding(10)
+        .background(Theme.bgSurface)
     }
 }
 
@@ -194,20 +199,21 @@ struct SessionRowView: View {
                         .fontWeight(.medium)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(agentColor.opacity(0.15))
+                        .background(agentBgColor)
                         .foregroundColor(agentColor)
                         .clipShape(RoundedRectangle(cornerRadius: 4))
 
                     if let project = session.projectName {
                         Text(project)
                             .font(.headline)
+                            .foregroundColor(Theme.text)
                             .lineLimit(1)
                     }
 
                     if let branch = session.gitBranch {
                         Text(branch)
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(Theme.textMuted)
                             .lineLimit(1)
                     }
 
@@ -215,20 +221,20 @@ struct SessionRowView: View {
 
                     Text(timeAgo)
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(Theme.textMuted)
                 }
 
                 if let message = session.firstUserMessage {
                     Text(message)
                         .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(Theme.textMuted)
                         .lineLimit(2)
                 }
 
                 if session.turnCount > 0 {
                     Text("\(session.turnCount) turns")
                         .font(.caption2)
-                        .foregroundStyle(.tertiary)
+                        .foregroundColor(Theme.textSubtle)
                 }
             }
 
@@ -236,7 +242,7 @@ struct SessionRowView: View {
             if let idx = shortcutIndex {
                 Text("\(appState.quickPublishSymbol)\(idx)")
                     .font(.caption)
-                    .foregroundStyle(.tertiary)
+                    .foregroundColor(Theme.textSubtle)
                     .frame(minWidth: 28, alignment: .trailing)
             }
         }
@@ -245,13 +251,13 @@ struct SessionRowView: View {
         .background(
             isSelected
                 ? RoundedRectangle(cornerRadius: 6)
-                    .fill(Color.accentColor.opacity(0.12))
+                    .fill(Theme.accentBlue.opacity(0.12))
                 : nil
         )
         .overlay(
             isSelected
                 ? RoundedRectangle(cornerRadius: 6)
-                    .strokeBorder(Color.accentColor.opacity(0.5), lineWidth: 1.5)
+                    .strokeBorder(Theme.accentBlue.opacity(0.5), lineWidth: 1.5)
                 : nil
         )
     }
@@ -264,11 +270,19 @@ struct SessionRowView: View {
         }
     }
 
+    private var agentBgColor: Color {
+        switch session.agent {
+        case .claudeCode: return Theme.claudeBg
+        case .codex: return Theme.codexBg
+        case .opencode: return Theme.opencodeBg
+        }
+    }
+
     private var agentColor: Color {
         switch session.agent {
-        case .claudeCode: return .orange
-        case .codex: return .green
-        case .opencode: return .blue
+        case .claudeCode: return Theme.claudeText
+        case .codex: return Theme.codexText
+        case .opencode: return Theme.opencodeText
         }
     }
 
@@ -303,7 +317,7 @@ struct PreviewPanelView: View {
                 } else if appState.previewTurns.isEmpty {
                     Spacer()
                     Text("No conversation data")
-                        .foregroundColor(.secondary)
+                        .foregroundColor(Theme.textMuted)
                         .frame(maxWidth: .infinity)
                     Spacer()
                 } else {
@@ -321,6 +335,7 @@ struct PreviewPanelView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Theme.bg)
         .onHover { hovering in
             appState.isHoveringPreviewPanel = hovering
             if !hovering {
@@ -345,20 +360,21 @@ private struct PreviewHeaderView: View {
                 .fontWeight(.medium)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
-                .background(agentColor.opacity(0.15))
-                .foregroundColor(agentColor)
+                .background(agentBgColor)
+                .foregroundColor(agentFgColor)
                 .clipShape(RoundedRectangle(cornerRadius: 4))
 
             if let project = session.projectName {
                 Text(project)
                     .font(.headline)
+                    .foregroundColor(Theme.text)
                     .lineLimit(1)
             }
 
             if let branch = session.gitBranch {
                 Text(branch)
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(Theme.textMuted)
                     .lineLimit(1)
             }
 
@@ -366,9 +382,10 @@ private struct PreviewHeaderView: View {
 
             Text(timeAgo)
                 .font(.caption)
-                .foregroundColor(.secondary)
+                .foregroundColor(Theme.textMuted)
         }
         .padding(10)
+        .background(Theme.bgSurface)
     }
 
     private var agentLabel: String {
@@ -379,11 +396,19 @@ private struct PreviewHeaderView: View {
         }
     }
 
-    private var agentColor: Color {
+    private var agentBgColor: Color {
         switch session.agent {
-        case .claudeCode: return .orange
-        case .codex: return .green
-        case .opencode: return .blue
+        case .claudeCode: return Theme.claudeBg
+        case .codex: return Theme.codexBg
+        case .opencode: return Theme.opencodeBg
+        }
+    }
+
+    private var agentFgColor: Color {
+        switch session.agent {
+        case .claudeCode: return Theme.claudeText
+        case .codex: return Theme.codexText
+        case .opencode: return Theme.opencodeText
         }
     }
 
@@ -411,7 +436,7 @@ struct PreviewTurnView: View {
                     if !trimmed.isEmpty {
                         Text(trimmed)
                             .font(.body)
-                            .foregroundColor(.primary)
+                            .foregroundColor(Theme.text)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 case .toolUse(let toolUse):
@@ -433,9 +458,9 @@ struct PreviewTurnView: View {
 
     private var roleColor: Color {
         switch turn.role {
-        case .user: return .blue
-        case .assistant: return .orange
-        case .tool: return .gray
+        case .user: return Theme.userText
+        case .assistant: return Theme.assistantText
+        case .tool: return Theme.toolText
         }
     }
 }
@@ -457,10 +482,10 @@ private struct ToolUsePill: View {
                     .truncationMode(.tail)
             }
         }
-        .foregroundColor(.secondary)
+        .foregroundColor(Theme.textMuted)
         .padding(.horizontal, 8)
         .padding(.vertical, 3)
-        .background(Color.secondary.opacity(0.1))
+        .background(Theme.bgElevated)
         .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 
@@ -505,7 +530,7 @@ struct ConfirmationBarView: View {
                 if let message = session.firstUserMessage {
                     Text(message)
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(Theme.textMuted)
                         .lineLimit(1)
                 }
             }
@@ -517,7 +542,7 @@ struct ConfirmationBarView: View {
             }
             .buttonStyle(.plain)
             .font(.subheadline)
-            .foregroundColor(.secondary)
+            .foregroundColor(Theme.textMuted)
 
             Button("Publish") {
                 appState.confirmPublish()
@@ -527,6 +552,6 @@ struct ConfirmationBarView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(.ultraThinMaterial)
+        .background(Theme.bgSurface)
     }
 }
