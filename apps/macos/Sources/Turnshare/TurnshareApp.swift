@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import HotKey
+import ServiceManagement
 import Sparkle
 
 @main
@@ -109,6 +110,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Register global hotkey
         registerHotKey()
+
+        // Register as login item (enabled by default on first launch)
+        LaunchAtLoginConfig.shared.applyToSystem()
     }
 
     func registerHotKey() {

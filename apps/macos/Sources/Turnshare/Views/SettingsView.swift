@@ -79,6 +79,32 @@ struct SettingsView: View {
 
             Divider()
 
+            // Launch at Login
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Startup")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+
+                Toggle(isOn: Binding(
+                    get: { LaunchAtLoginConfig.shared.isEnabled },
+                    set: { newValue in
+                        LaunchAtLoginConfig.shared.update(newValue)
+                    }
+                )) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Launch at login")
+                            .font(.subheadline)
+                        Text("Automatically start Turnshare when you log in")
+                            .font(.caption)
+                            .foregroundColor(Theme.textMuted)
+                    }
+                }
+                .toggleStyle(.switch)
+                .controlSize(.small)
+            }
+
+            Divider()
+
             // GitHub Account
             VStack(alignment: .leading, spacing: 6) {
                 Text("GitHub")
