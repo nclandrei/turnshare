@@ -6,6 +6,11 @@ struct SessionListView: View {
     @EnvironmentObject var appState: AppState
     @State private var showSettings = false
 
+    /// Returns a properly pluralized session count label (e.g. "1 session", "3 sessions").
+    static func sessionCountLabel(_ count: Int) -> String {
+        count == 1 ? "1 session" : "\(count) sessions"
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // Search bar
@@ -147,6 +152,7 @@ struct FooterView: View {
                     .font(.caption)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(AccessibilityID.settingsButtonLabel)
 
             if appState.isAuthenticated, let username = appState.githubUsername {
                 Image(systemName: "person.circle.fill")
@@ -172,7 +178,7 @@ struct FooterView: View {
 
             Spacer()
 
-            Text("\(appState.filteredSessions.count) sessions")
+            Text(SessionListView.sessionCountLabel(appState.filteredSessions.count))
                 .font(.caption)
                 .foregroundColor(Theme.textMuted)
         }

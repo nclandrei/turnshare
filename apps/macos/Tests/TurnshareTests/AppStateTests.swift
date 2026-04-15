@@ -237,6 +237,21 @@ final class AppStateTests: XCTestCase {
         // There's no selectedIndex concept in instant mode
     }
 
+    // MARK: - Session Count Label
+
+    func testSessionCountLabelSingular() {
+        XCTAssertEqual(sessionCountLabel(1), "1 session")
+    }
+
+    func testSessionCountLabelZero() {
+        XCTAssertEqual(sessionCountLabel(0), "0 sessions")
+    }
+
+    func testSessionCountLabelPlural() {
+        XCTAssertEqual(sessionCountLabel(2), "2 sessions")
+        XCTAssertEqual(sessionCountLabel(100), "100 sessions")
+    }
+
     // MARK: - Publish Cache
 
     func testPublishCacheLookupAndStore() {
@@ -282,6 +297,11 @@ final class AppStateTests: XCTestCase {
     }
 
     // MARK: - Helpers
+
+    /// Mirrors the session count label logic in SessionListView.
+    private func sessionCountLabel(_ count: Int) -> String {
+        SessionListView.sessionCountLabel(count)
+    }
 
     /// Mirrors the shortcut index assignment logic: items 0-8 get 1-9, rest get nil.
     private func shortcutIndex(for index: Int) -> Int? {
