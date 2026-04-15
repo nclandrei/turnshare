@@ -140,9 +140,14 @@ public struct ClaudeProvider {
                   let type = entry["type"] as? String else { continue }
 
             if type == "user" && firstUserMessage == nil {
-                if let msg = entry["message"] as? [String: Any],
-                   let content = msg["content"] as? String {
-                    firstUserMessage = String(content.prefix(200))
+                if let msg = entry["message"] as? [String: Any] {
+                    if let content = msg["content"] as? String {
+                        firstUserMessage = String(content.prefix(200))
+                    } else if let contentArray = msg["content"] as? [[String: Any]],
+                              let firstText = contentArray.first(where: { $0["type"] as? String == "text" }),
+                              let text = firstText["text"] as? String {
+                        firstUserMessage = String(text.prefix(200))
+                    }
                 }
                 if sessionId == nil {
                     sessionId = entry["sessionId"] as? String
@@ -183,12 +188,22 @@ public struct ClaudeProvider {
 
     private func parseUserTurn(_ entry: [String: Any]) -> Turn? {
         guard let msg = entry["message"] as? [String: Any],
-              let content = msg["content"] as? String,
               let timestamp = parseTimestamp(entry["timestamp"]) else { return nil }
+
+        let text: String
+        if let content = msg["content"] as? String {
+            text = content
+        } else if let contentArray = msg["content"] as? [[String: Any]],
+                  let firstText = contentArray.first(where: { $0["type"] as? String == "text" }),
+                  let t = firstText["text"] as? String {
+            text = t
+        } else {
+            return nil
+        }
 
         return Turn(
             role: .user,
-            content: [.text(content)],
+            content: [.text(text)],
             timestamp: timestamp
         )
     }

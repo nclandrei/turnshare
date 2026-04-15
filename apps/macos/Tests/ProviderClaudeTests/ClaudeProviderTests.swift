@@ -175,6 +175,46 @@ final class ClaudeProviderTests: XCTestCase {
         XCTAssertEqual(session.turns.count, 1)
     }
 
+    // MARK: - Array Content Format
+
+    func testScanSessionHandlesArrayContent() throws {
+        let projectDir = tempDir.appendingPathComponent("-Users-test-project")
+        try FileManager.default.createDirectory(at: projectDir, withIntermediateDirectories: true)
+
+        let file = projectDir.appendingPathComponent("array-content.jsonl")
+        let jsonl = """
+        {"type":"user","message":{"role":"user","content":[{"type":"text","text":"Help me build an app"}]},"sessionId":"s1","cwd":"/tmp/proj","timestamp":"2026-04-15T08:00:00.000Z"}
+        {"type":"assistant","timestamp":"2026-04-15T08:00:01.000Z","message":{"model":"claude-opus-4-6","content":[{"type":"text","text":"Sure!"}]}}
+        """
+        try jsonl.write(to: file, atomically: true, encoding: .utf8)
+
+        let provider = ClaudeProvider(claudeDir: tempDir)
+        let summary = provider.scanSession(at: file)
+        XCTAssertNotNil(summary)
+        XCTAssertEqual(summary?.id, "s1")
+        XCTAssertEqual(summary?.firstUserMessage, "Help me build an app")
+    }
+
+    func testParseSessionHandlesArrayContentInUserTurn() throws {
+        let file = tempDir.appendingPathComponent("array-user.jsonl")
+        let jsonl = """
+        {"type":"user","sessionId":"s1","cwd":"/tmp/proj","timestamp":"2026-04-15T08:00:00.000Z","message":{"role":"user","content":[{"type":"text","text":"Help me build an app"}]}}
+        {"type":"assistant","timestamp":"2026-04-15T08:00:01.000Z","message":{"model":"claude-opus-4-6","content":[{"type":"text","text":"Sure!"}]}}
+        """
+        try jsonl.write(to: file, atomically: true, encoding: .utf8)
+
+        let provider = ClaudeProvider(claudeDir: tempDir)
+        let session = try provider.parseSession(at: file)
+
+        XCTAssertEqual(session.turns.count, 2)
+        XCTAssertEqual(session.turns[0].role, .user)
+        if case .text(let text) = session.turns[0].content.first {
+            XCTAssertEqual(text, "Help me build an app")
+        } else {
+            XCTFail("Expected first content block to be .text")
+        }
+    }
+
     // MARK: - Helpers
 
     private func makeMinimalJSONL(sessionId: String = "sess-1", timestamp: String = "2024-01-01T00:00:00.000Z") -> String {
