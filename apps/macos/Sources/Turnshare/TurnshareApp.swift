@@ -11,6 +11,13 @@ struct TurnshareApp: App {
     var body: some Scene {
         // No visible windows — all UI is in the floating panel
         Settings { EmptyView() }
+            .commands {
+                CommandGroup(replacing: .appInfo) {
+                    Button("About Turnshare") {
+                        appDelegate.showAboutPanel(nil)
+                    }
+                }
+            }
     }
 }
 
@@ -322,6 +329,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hudDismissTask?.cancel()
         hudDismissTask = nil
         hudPanel.orderOut(nil)
+    }
+
+    // MARK: - About Panel
+
+    /// Window level used for the About panel so it renders above the floating panel.
+    static let aboutPanelLevel = NSWindow.Level(NSWindow.Level.floating.rawValue + 1)
+
+    /// Show the standard About panel above the floating panel.
+    /// Called automatically by the responder chain when the user selects
+    /// "About Turnshare" from the application menu.
+    @objc func showAboutPanel(_ sender: Any?) {
+        NSApp.orderFrontStandardAboutPanel(sender)
+        // The About window is created asynchronously by AppKit; raise its level
+        // on the next run-loop tick so it appears above the floating panel.
+        DispatchQueue.main.async {
+            for window in NSApp.windows where window.title.contains("About") {
+                window.level = Self.aboutPanelLevel
+                window.makeKeyAndOrderFront(nil)
+            }
+        }
     }
 
     private func scheduleHUDDismiss(after nanoseconds: UInt64) {
