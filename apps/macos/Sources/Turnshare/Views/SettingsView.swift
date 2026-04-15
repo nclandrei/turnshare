@@ -75,6 +75,8 @@ struct SettingsView: View {
                 }
                 .toggleStyle(.switch)
                 .controlSize(.small)
+                .accessibilityIdentifier(AccessibilityID.confirmBeforePublishingToggle)
+                .accessibilityLabel(AccessibilityID.confirmBeforePublishingLabel)
             }
 
             Divider()
@@ -101,6 +103,8 @@ struct SettingsView: View {
                 }
                 .toggleStyle(.switch)
                 .controlSize(.small)
+                .accessibilityIdentifier(AccessibilityID.launchAtLoginToggle)
+                .accessibilityLabel(AccessibilityID.launchAtLoginLabel)
             }
 
             Divider()
