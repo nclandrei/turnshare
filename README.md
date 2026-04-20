@@ -28,6 +28,7 @@ Sessions are read directly from `~/.claude/projects/` and `~/.codex/` — no con
 ### Homebrew (recommended)
 
 ```bash
+brew tap nclandrei/tap
 brew install --cask nclandrei/tap/turnshare
 ```
 
