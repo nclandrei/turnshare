@@ -59,9 +59,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Create floating panel
         panel = FloatingPanel(
-            rootView: SessionListView()
-                .environmentObject(appState)
-                .environmentObject(updaterController)
+            rootView: RootView {
+                SessionListView()
+                    .environmentObject(appState)
+                    .environmentObject(updaterController)
+            }
         )
 
         // Wire Cmd+1-9 from panel to AppState
@@ -247,7 +249,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.hasShadow = true
 
         let hostingView = NSHostingView(
-            rootView: PreviewPanelView().environmentObject(appState)
+            rootView: RootView { PreviewPanelView().environmentObject(appState) }
         )
         hostingView.wantsLayer = true
         hostingView.layer?.cornerRadius = 12
@@ -262,7 +264,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private static func makeHUDPanel(appState: AppState) -> NSPanel {
         let hostingView = NSHostingView(
-            rootView: PublishHUDView().environmentObject(appState)
+            rootView: RootView { PublishHUDView().environmentObject(appState) }
         )
 
         let panel = NSPanel(
