@@ -181,5 +181,17 @@
       sparkle:edSignature="X/n/i/nzlkq65qT8tgYF2Cm6Dr8hSIvJOEUn0XOWMJrp69f5g2NFLR4y/0KKTWwpTXJd4jcpK+v9zJxILFR+BA=="
     />
   </item>
+      <item>
+    <title>Turnshare v20260425.081733</title>
+    <pubDate>Sat, 25 Apr 2026 08:19:27 +0000</pubDate>
+    <sparkle:version>20260425.081733</sparkle:version>
+    <sparkle:shortVersionString>0.2.7</sparkle:shortVersionString>
+    <enclosure
+      url="https://github.com/nclandrei/turnshare/releases/download/v20260425.081733/Turnshare.zip"
+      length="1501060"
+      type="application/octet-stream"
+      sparkle:edSignature="/PwB/eAex0LJPi8HjAaOjj/ZjdFbYwDkS94vkUcKqPo+1nO0Tai5oYr2tg78nktsrLDOgojNH/cZcxfUFa+eAA=="
+    />
+  </item>
   </channel>
 </rss>
